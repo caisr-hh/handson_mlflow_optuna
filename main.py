@@ -6,7 +6,7 @@ part of an optuna optimization study.
 
 """
 
-from configs.model_config import ModelConfig
+
 from demo.training import Pipeline
 from demo.loggers import LocalLogger, OptunaLogger, MLFlowLogger, FinalLogger
 from demo.constants import LOGGERS, OPTUNA_STUDY_NAME, MLFLOW_EXPERIMENT_NAME
@@ -97,24 +97,25 @@ class OptunaStudyRunner:
         )
 
     def finalize(self):
+        #TODO: Implement the function that looks up the winning optuna configuration, retrains it and logs it fully with a model artifact.
         """
         Once we have our optimal configuration we do one final training run based on this configuration.
         We can load the custom attributes of study.best_trial and send this onwards to mlflowdriver, overriding the old loggers
         with the FinaLogger which extends the standard MLFlow logger. This logger handles the model logging differently,
         turning the model into a scripted model with less source code and dependencies to handle.
 
-        It then registers
-
-        This way we avoid bloating the registry
         """
-        self.pipeline.config = ModelConfig.model_validate(
-            self.study.best_trial.user_attrs["config"]
-        )
+        #TODO: Look at the best trials user defined attribute with self.study.best_trial.user_attrs["attribute"].
+        #Remember that we saved the configurations in the optuna logger.
+        #self.pipeline.config = ModelConfig.model_validate(...)
+
+        #Remove unused loggers:
         self.pipeline.logger.reset_logger()
 
+        #TODO: Call the mlflowdriver as before but specify the FinalLogger class as our logger class.
         mlflowdriver(self.pipeline, FinalLogger)
 
-        return self.pipeline.test_metrics.test_loss
+        return
 
 
 def mlflowdriver(pipeline: Pipeline, Logger: MLFlowLogger = MLFlowLogger):
@@ -136,7 +137,7 @@ def mlflowdriver(pipeline: Pipeline, Logger: MLFlowLogger = MLFlowLogger):
 
 def run_project():
     """
-    Load model config, set up loggers and creater the pipeline.
+    Load model config, set up loggers and create the pipeline.
 
     This pipeline can be run as is, but we will wrap it in optuna and mlflow.
     The pipeline logger is a logger class that collects and passes on logging calls.
@@ -157,7 +158,8 @@ def run_project():
     pipeline = Pipeline(config=config, logger=pipelinelogger)
     opt_runner = OptunaStudyRunner(pipeline)
     opt_runner._optimize()
-    opt_runner.finalize()
+    #TODO: call .finalize()
+
 
 
 run_project()

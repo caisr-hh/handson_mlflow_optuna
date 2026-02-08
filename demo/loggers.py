@@ -201,17 +201,13 @@ class FinalLogger(MLFlowLogger):
         model_string = yaml.dump(model.config.model_dump())
         mlflow.log_text(model_string, artifact_file="configs/ModelConfig.yaml")
 
-        # Set a the "status" tag to "optimal", identifying this as the optimization winner
-        mlflow.set_tag("status", "optimal")
+        #TODO: Set a the "status" tag to "optimal", identifying this as the optimization winner
+
 
         # export to a scripted model with torch.jit.script(model)
-        script_model = torch.jit.script(model)
+        #script_model =
 
         # provide an input example to infer signature.
         data_example = construct_data(model.config).test_loader.dataset[0:10][0].numpy()
-        # Register our model:
-        mlflow.pytorch.log_model(
-            pytorch_model=script_model,
-            registered_model_name=REGISTERED_MODEL_NAME,
-            input_example=data_example,
-        )
+        # TODO: Register our model. Use registered_model_name=REGISTERED_MODEL_NAME constant for the model registration.
+        #mlflow.pytorch.log_model(pytorch_model, registered_model_name,input_example)
