@@ -56,5 +56,7 @@ def construct_data(config: ModelConfig) -> ModelData:
     training_loader = DataLoader(dataset_train, batch_size=config.batch_size)
     test_loader = DataLoader(dataset_test, batch_size=config.batch_size)
 
-    data = ModelData(config=config, training_loader=training_loader, test_loader=test_loader)
+    data = ModelData(
+        config=config, training_loader=training_loader, test_loader=test_loader
+    )
     return data

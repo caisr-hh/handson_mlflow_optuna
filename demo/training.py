@@ -43,7 +43,9 @@ class Pipeline:
 
     def training_loop(self) -> MlpModel:
 
-        optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.model.config.learning_rate)
+        optimizer = torch.optim.AdamW(
+            self.model.parameters(), lr=self.model.config.learning_rate
+        )
         loss_function = torch.nn.BCELoss()
 
         self.model.train()
@@ -70,7 +72,9 @@ class Pipeline:
                 accuracy = n_correct / n_samples
                 metrics = EpochMetrics(epoch_loss=loss_sum, epoch_accuracy=accuracy)
 
-                self.logger.log_epoch(metrics,epoch)  # Calls all our included loggers for this epoch
+                self.logger.log_epoch(
+                    metrics, epoch
+                )  # Calls all our included loggers for this epoch
         except HaltTraining as error:
             self.logger.log_interruption(error.context)
 

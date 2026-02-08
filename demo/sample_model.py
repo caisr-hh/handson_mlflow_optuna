@@ -27,7 +27,9 @@ class MlpModel(nn.Module):
             self.layers = nn.Sequential(inp_layer, *intermediates, out_layer)
 
         else:
-            self.layers = nn.Sequential(nn.Linear(in_features=2, out_features=1), nn.Sigmoid())
+            self.layers = nn.Sequential(
+                nn.Linear(in_features=2, out_features=1), nn.Sigmoid()
+            )
 
         self.config = config
         self.runinfo = runinfo

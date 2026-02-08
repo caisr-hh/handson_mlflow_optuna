@@ -50,7 +50,9 @@ def plot_server_res():
     grid_list = grid.tolist()
     json_dump = json.dumps({"inputs": grid_list})
     response = requests.post(
-        "http://127.0.0.1:5001/invocations", data=json_dump, headers={"Content-Type": "application/json"}
+        "http://127.0.0.1:5001/invocations",
+        data=json_dump,
+        headers={"Content-Type": "application/json"},
     )
     values = response.json()["predictions"]
     plt.scatter(x, y, c=values, cmap="plasma", s=5)

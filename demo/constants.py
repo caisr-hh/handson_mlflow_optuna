@@ -13,6 +13,7 @@ class CONFIG_DIR(Enum):
     OPTUNA = "configs/optuna.yaml"
     MLFLOW = "configs/mlflow.yaml"
 
+
 OPTUNA_STUDY_NAME = "Tutorialstudy_MLP"
 
 MLFLOW_EXPERIMENT_NAME = "Tutorial_tooling_MLP"
