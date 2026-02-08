@@ -7,6 +7,7 @@ from demo.constants import CONFIG_DIR
 
 
 class MlpModel(nn.Module):
+    #Just a MLP that can be generalized down to a linear regression if depth=0.
     def __init__(self, config: ModelConfig, runinfo: RunInfo | None = None):
         super(MlpModel, self).__init__()
         if config.n_depth > 0:

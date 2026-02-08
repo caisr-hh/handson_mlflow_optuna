@@ -50,7 +50,7 @@ def plot_server_res():
     grid_list = grid.tolist()
     json_dump = json.dumps({"inputs": grid_list})
     response = requests.post(
-        "http://127.0.0.1:5001/invocations",
+        "http://127.0.0.1:5001/invocations", #<-----TODO: Update to you hosted mlflow servers port and adress manually this time....
         data=json_dump,
         headers={"Content-Type": "application/json"},
     )

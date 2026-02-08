@@ -102,7 +102,7 @@ class PipelineLogger(Logger):
 class LocalLogger(Logger):
     """
     The default logger.
-    Prints epoch loss, test results and saves a figure.
+    Prints epoch loss, test results and prints a figure if allowed (toggle off for batch runs).
     """
 
     def __init__(self, show_figure: bool = True):
@@ -124,21 +124,32 @@ class LocalLogger(Logger):
 
 
 class OptunaLogger(Logger):
+    """
+    The optuna logger will handle the pruning by monitoring the loss at each epoch and raising exceptions.
+    """
 
     def log_epoch(self, metrics: EpochMetrics, epoch: int):
+        #terminate the loop by first raising a generic HaltTraining interruption wit the pruning context.
+        #It should then allow the other loggers to exit gracefully before reraising the interruption with the optuna specific error.
+
         trial = self.runinfo.trial
         if trial:
+            #Report the loss to let the pruner decide if it is time to prune.
             trial.report(metrics.epoch_loss, epoch)
 
+            #Should be prune?
             if trial.should_prune():
+                # terminate the loop by first raising a generic HaltTraining interruption wit the "pruned" context.
+                # It should then allow the other loggers to exit gracefully before reraising the interruption with the optuna specific
                 raise HaltTraining(context="pruned")
 
     def log_interruption(self, context: str):
-
+        #Raise the standard optuna.TrialPruned() error:
         if context == "pruned":
             raise optuna.TrialPruned()
 
     def log_model(self, model: Module):
+        #Set the trial user attribute "mlflow_run_id" to trial, and add the model config to "config"
         runinfo = self.runinfo
         trial = runinfo.trial
         if runinfo:
@@ -149,24 +160,39 @@ class OptunaLogger(Logger):
 class MLFlowLogger(Logger):
 
     def log_epoch(self, metrics: EpochMetrics, epoch: int):
+        #convert the metrics into a dictionary using asdict() and log at step = epoch:
         mlflow.log_metrics(metrics=asdict(metrics), step=epoch)
 
     def log_test(self, metrics: TestMetrics):
+        #Log test loss and accuracy:
         mlflow.log_metrics(asdict(metrics))
 
     def log_figure(self, fig):
+        #The figure will reside in the root artifact storage for this run as boundary.png.
         mlflow.log_figure(fig, "boundary.png")
 
     def log_interruption(self, context: str):
         if context == "pruned":
+            #Set the "status" tag to "pruned";
             mlflow.set_tag("status", "pruned")
 
     def log_model(self, model: Module):
-
+        #Log the config dictionary:
+        mlflow.log_params(model.config.dict())
+        #For grouping purposes we set the tag "status" as "complete"
         mlflow.set_tag("status", "complete")
 
 
 class FinalLogger(MLFlowLogger):
+    """
+    This logger only needs a different log_model method to its parent class,
+    turning the model into a scripted model with less source code and dependencies to handle.
+
+    It then registers a tag in mlflow that identifies that this is the optimal
+
+    This way we avoid bloating the registry, and we can register our first model.
+    In this example we will promote it to the registry directly.
+    """
 
     def log_model(self, model: Module):
         mlflow.set_tag("status", "optimal")

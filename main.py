@@ -24,8 +24,16 @@ import optuna
 
 class OptunaStudyRunner:
     def __init__(self, pipeline):
+
+        """We initialize our study, setting the active pipeline to be used during optimization and
+        loading the configuration for our study defined in /configs.
+
+
+        """
         self.pipeline = pipeline
         self.study = None
+
+        # See: configs/optuna.yaml:
         self.config = load_optuna_config()
         self.config.study.study = OPTUNA_STUDY_NAME
 
@@ -38,6 +46,7 @@ class OptunaStudyRunner:
         # Define our sampler (TPE is by default, but we also set the seed here):
         sampler = optuna.samplers.TPESampler(seed=self.config.study.seed)
 
+        #Create our study:
         self.study = optuna.create_study(
             study_name=self.config.study.study,
             direction="minimize",
@@ -48,22 +57,35 @@ class OptunaStudyRunner:
         )
 
     def objective(self, trial):
+
+        """
+        This objective is run for each new trial, a guess for new hyperparameter configurations.
+        First we initialize the optuna logger that is responsible for handling calls relevant for optuna.
+        Use trial.suggest_float, ..._int, ..._categorical with minimum or maximum. For documentation see:
+
+        https://optuna.readthedocs.io/en/stable/reference/generated/optuna.trial.Trial.html
+
+        Once the configuration has been set up we can either run the pipeline and our study directly or we can add a mlflow layer
+        by using the mlflow runner we are setting up here.
+
+
+        """
         config = self.pipeline.config
         runinfo = self.pipeline.runinfo
         logger = self.pipeline.logger
+
+        # Add the current trial to the runinfo of the model
+        runinfo.trial = trial
 
         # Initialize our logger:
         optuna_logger = OptunaLogger(runinfo)
         logger.set_logger(key=LOGGERS.OPTUNA.value, logger=optuna_logger)
 
-        # Add the current trial to the runinfo of the model
-        runinfo.trial = trial
-
         # Let us try optimize a few parameters, for example the width and the depth of the network:
         config.n_width = trial.suggest_int("width", 4, 32)
         config.n_depth = trial.suggest_int(
             "depth", 0, 3
-        )  # At 0 depth we have more of a linear regressor than an mlp.
+        )
         # Now we may run the pipeline as is, or we may wrap it up in mlflow first:
         mlflowdriver(self.pipeline)
         # self.pipeline.run()
@@ -79,6 +101,17 @@ class OptunaStudyRunner:
         )
 
     def finalize(self):
+
+        """
+        Once we have our optimal configuration we do one final training run based on this configuration.
+        We can load the custom attributes of study.best_trial and send this onwards to mlflowdriver, overriding the old loggers
+        with the FinaLogger which extends the standard MLFlow logger. This logger handles the model logging differently,
+        turning the model into a scripted model with less source code and dependencies to handle.
+
+        It then registers
+
+        This way we avoid bloating the registry
+        """
         self.pipeline.config = ModelConfig.model_validate(
             self.study.best_trial.user_attrs["config"]
         )
