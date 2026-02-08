@@ -99,5 +99,4 @@ class Pipeline:
         metrics = TestMetrics(test_loss=loss_sum, test_accuracy=accuracy)
         self.test_metrics = metrics
 
-
         return metrics
