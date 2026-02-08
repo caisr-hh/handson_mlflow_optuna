@@ -1,0 +1,11 @@
+# Service
+scheme: http
+host: 127.0.0.1
+port: 5000
+
+# DB
+backend_path: mlruns/mlflow.db # relative to repo root
+backend_kind: sqlite
+
+# Artifacts
+artifacts_root: mlruns # relative to repo root
