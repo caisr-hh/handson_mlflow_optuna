@@ -1,12 +1,3 @@
-"""
-Welcome to the first example!
-
-Implement the TODO's listed in this file to make the training loop (that you can initially run by executing this file)
-part of an optuna optimization study.
-
-"""
-
-
 from demo.training import Pipeline
 from demo.loggers import LocalLogger, OptunaLogger, MLFlowLogger, FinalLogger
 from demo.constants import LOGGERS, OPTUNA_STUDY_NAME, MLFLOW_EXPERIMENT_NAME
@@ -82,9 +73,10 @@ class OptunaStudyRunner:
         # Let us try optimize a few parameters, for example the width and the depth of the network:
         config.n_width = trial.suggest_int("width", 4, 32)
         config.n_depth = trial.suggest_int("depth", 0, 3)
-        # Now we may run the pipeline as is, or we may wrap it up in mlflow first:
-        mlflowdriver(self.pipeline)
-        # self.pipeline.run()
+
+        # TODO:instead of running the pipeline as below, let us call mlflowdriver with the pipeline (and leave the logger as the default)
+        self.pipeline.run()  # <--- Remove!
+        # mlflowdriver(...)
         return self.pipeline.test_metrics.test_loss
 
     def _optimize(self):
@@ -97,39 +89,27 @@ class OptunaStudyRunner:
         )
 
     def finalize(self):
-        #TODO: Implement the function that looks up the winning optuna configuration, retrains it and logs it fully with a model artifact.
-        """
-        Once we have our optimal configuration we do one final training run based on this configuration.
-        We can load the custom attributes of study.best_trial and send this onwards to mlflowdriver, overriding the old loggers
-        with the FinaLogger which extends the standard MLFlow logger. This logger handles the model logging differently,
-        turning the model into a scripted model with less source code and dependencies to handle.
-
-        """
-        #TODO: Look at the best trials user defined attribute with self.study.best_trial.user_attrs["attribute"].
-        #Remember that we saved the configurations in the optuna logger.
-        #self.pipeline.config = ModelConfig.model_validate(...)
-
-        #Remove unused loggers:
-        self.pipeline.logger.reset_logger()
-
-        #TODO: Call the mlflowdriver as before but specify the FinalLogger class as our logger class.
-        mlflowdriver(self.pipeline, FinalLogger)
 
         return
 
 
 def mlflowdriver(pipeline: Pipeline, Logger: MLFlowLogger = MLFlowLogger):
     mlflow_config = load_mlflow_config()
-    mlflow.set_tracking_uri(mlflow_config.tracking_uri)
-    mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
+    # TODO:Set tracking URI (mlflow_config.tracking_uri)
+    # mlflow.set_tracking_uri(...)
+    # TODO: Set experiment by name (use the constant MLFLOW_EXPERIMENT_NAME)
+    # mlflow.set_experiment(...)
 
     with mlflow.start_run() as run:
         runinfo = pipeline.runinfo
 
+        # Gets the runid of the active run
         runinfo.run_id = run.info.run_id
+        # Initialize logger
         mlflow_logger = Logger(runinfo)
 
         pipeline.logger.set_logger(key=LOGGERS.MLFLOW.value, logger=mlflow_logger)
+        # Run pipeline!
         pipeline.run()
 
     return pipeline
@@ -158,8 +138,6 @@ def run_project():
     pipeline = Pipeline(config=config, logger=pipelinelogger)
     opt_runner = OptunaStudyRunner(pipeline)
     opt_runner._optimize()
-    #TODO: call .finalize()
-
 
 
 run_project()

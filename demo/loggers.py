@@ -159,55 +159,40 @@ class MLFlowLogger(Logger):
 
     def log_epoch(self, metrics: EpochMetrics, epoch: int):
         # convert the metrics into a dictionary using asdict() and log at step = epoch:
-        mlflow.log_metrics(metrics=asdict(metrics), step=epoch)
+        metric_dict = asdict(metrics)
+        # mlflow...
+        pass
 
     def log_test(self, metrics: TestMetrics):
         # Log test loss and accuracy:
-        mlflow.log_metrics(asdict(metrics))
+        metric_dict = asdict(metrics)
+        # mlflow...
+        pass
 
     def log_figure(self, fig):
-        # The figure will reside in the root artifact storage for this run as boundary.png.
-        mlflow.log_figure(fig, "boundary.png")
+        # Log as boundary.png.
+        # mlflow...
+        pass
 
     def log_interruption(self, context: str):
         if context == "pruned":
-            # Set the "status" tag to "pruned";
-            mlflow.set_tag("status", "pruned")
+            # TODO: Set the "status" tag to "pruned";
+
+            # mlflow...
+            pass
 
     def log_model(self, model: Module):
-        # Log the config dictionary:
-        mlflow.log_params(model.config.dict())
+        # TODO: Log the config dictionary as parameters:
+        dict = model.config.dict()
+        # mlflow...
+        # TODO: Log the config as "configs/ModelConfig.yaml"
         model_string = yaml.dump(model.config.model_dump())
-        mlflow.log_text(model_string, artifact_file="configs/ModelConfig.yaml")
-        # For grouping purposes we set the tag "status" as "complete":
-        mlflow.set_tag("status", "complete")
+        # mlflow..
+        # TODO: For grouping purposes we set the tag "status" as "complete":
+        # mlflow...
 
 
 class FinalLogger(MLFlowLogger):
-    """
-    This logger only needs a different log_model method to its parent class,
-    turning the model into a scripted model with less source code and dependencies to handle.
-
-    It then registers a tag in mlflow that identifies that this is the optimal
-
-    This way we avoid bloating the registry, and we can register our first model.
-    In this example we will promote it to the registry directly.
-    """
 
     def log_model(self, model: Module):
-
-        # Log the parameters as usual
-        mlflow.log_params(model.config.dict())
-        model_string = yaml.dump(model.config.model_dump())
-        mlflow.log_text(model_string, artifact_file="configs/ModelConfig.yaml")
-
-        #TODO: Set a the "status" tag to "optimal", identifying this as the optimization winner
-
-
-        # export to a scripted model with torch.jit.script(model)
-        #script_model =
-
-        # provide an input example to infer signature.
-        data_example = construct_data(model.config).test_loader.dataset[0:10][0].numpy()
-        # TODO: Register our model. Use registered_model_name=REGISTERED_MODEL_NAME constant for the model registration.
-        #mlflow.pytorch.log_model(pytorch_model, registered_model_name,input_example)
+        pass
