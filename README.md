@@ -1,2 +1,2 @@
-# handson_mlflow_optuna
-A quick handson demo for HPO using optuna and mlflow.
+# Finished example.
+Checkout the branches for step 1, 2,3 and four in order and solve the tasks.
