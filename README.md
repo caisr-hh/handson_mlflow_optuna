@@ -3,7 +3,7 @@
 Now at last we want to finish the optuna study with retraining the winning configuration and logging it as a model that can be accessed through the mlflow model registry.
 As usual check for TODO's in the files main.py and demo/loggers.py. It is recommended that you delete previous runs in mlflow (but do NOT delete the run!), and you can delete the study in the optuna-dashboard interface.
 
-##Steps
+## Steps
 1) Please implement the listed steps in the FinalLogger class under demo/loggers.py. It is based on the Mlflow logger class but has a more extensive model logging procedure.
 We will first convert the model into a scripted model using torch.jit.script(model), which is handy for reducing the necessary source setups if the model is compatible. Log this scripted model using the pytorch flavour, 
 and provide an input example to provide a mode signature. 
