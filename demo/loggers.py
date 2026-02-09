@@ -127,34 +127,13 @@ class OptunaLogger(Logger):
     """
 
     def log_epoch(self, metrics: EpochMetrics, epoch: int):
-        # terminate the loop by first raising a generic HaltTraining interruption wit the pruning context.
-        # It should then allow the other loggers to exit gracefully before reraising the interruption with the optuna specific error.
-
-        trial = self.runinfo.trial
-        if trial:
-            # TODO: Report the loss to let the pruner decide if it is time to prune.
-            # trial.report(...)
-
-            # TODO: Should we prune?
-
-            # if trial..
-
-            # raise HaltTraining(context="pruned")
-            pass
+        pass
 
     def log_interruption(self, context: str):
-        # Raise the standard optuna.TrialPruned() error:
-        if context == "pruned":
-            raise optuna.TrialPruned()
+        pass
 
     def log_model(self, model: Module):
-        # Set the trial user attribute "mlflow_run_id" to trial, and add the model config to "config"
-        runinfo = self.runinfo
-        trial = runinfo.trial
-        if runinfo:
-            trial.set_user_attr("mlflow_run_id", runinfo.run_id)
-            trial.set_user_attr("config", model.config.dict())
-
+        pass
 
 class MLFlowLogger(Logger):
     pass

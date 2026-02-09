@@ -1,11 +1,22 @@
-# Hands on step 2: Pruning.
+# Hands on step  1: HPO with optuna.
 
-Now we attempt to speed up our search by pruning unpromising trials early.
-As before check for TODO's in the files main.py and demo/loggers.py. It is recommended you delete the study in the optuna-dashboard interface, as otherwise it will be continued.
+Let us consider a very basic problem. We have an MLP for classification of 2d points and want to find an optimal width and depth for our network.
+
+This pipeline relies on loggers collected under a shared pipelinelogger that forwards calls. We have a very simple local logger implemented as
+our baseline. Look at the TODO's in the run_project function in main.py. Try running a single training session with the plotting on
+before disabling it for future runs. 
+
+
+As an Initial step try running the code as is 
+
+Check for TODO's in the files main.py and demo/loggers.py. 
 
 ##Steps:
-1)    Go to the OptunaStudyRunner and define the pruner in __init__(). Check the parameters n_startup_trials,n_warmup_steps in the loaded optuna config.
-2)	Go to demo/loggers.py and look for the OptunaLogger. In the method that report loss for each training epoch,
-      report this loss using trial.report(). We also need to know when to raise an exception and exit training, so we can poll trial.should_prune().
-      This exception when thrown with context = "pruned" triggers other loggers to handle the interruption.
-3)    Try running the HPO and verify that it is pruning trials. You may also check out the study in the optuna-dashboard.
+0) This pipeline relies on loggers collected under a shared pipelinelogger that forwards calls. We have a very simple local logger implemented as
+ our baseline. Look at the TODO's in the run_project function in main.py. Try running a single training session with the plotting on
+ before disabling it for future runs. 
+1) Instead of running the pipeline directly, pass it to a OptunaStudyRunner.
+2) Look at the initialization of OptunaStudyRunner and implement the necessary changes to set up the study. Note the config described by configs/optuna.yaml.
+3) Go to the objective function (or method in this case) and suggest some integers with .suggest_int(name, low, high) for the width and depth configuration of the pipeline.
+4) Setup the optimizer to call the right method.
+5) Try running the HPO, if you have set up optuna-dashboard you should be able to see the study in the ui.

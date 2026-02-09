@@ -24,23 +24,18 @@ class OptunaStudyRunner:
         self.study = None
 
         # See: configs/optuna.yaml:
-        # TODO:Use config to set up pruner
         self.config = load_optuna_config()
         self.config.study.study = OPTUNA_STUDY_NAME
 
-        # TODO: Set up a pruner (median pruner) with n_startup_trials and n_warmup_steps :
-        # pruner = optuna.pruners.MedianPruner(n_startup_trials=..,n_warmup_steps=...)
+        # TODO: Define our sampler (TPE is by default, but we also set the seed here with the config):
+        # sampler = optuna.samplers.TPESampler(seed=..)
 
-        # Define our sampler (TPE is by default, but we also set the seed here):
-        sampler = optuna.samplers.TPESampler(seed=self.config.study.seed)
-
-        # Create our study:
+        # TODO: Create our study:
         self.study = optuna.create_study(
             study_name=self.config.study.study,
-            direction="minimize",
-            # TODO: pruner=pruner,
+            # TODO: direction=,
             storage=self.config.storage.uri,
-            sampler=sampler,
+            # TODO: sampler=sampler,
             load_if_exists=self.config.study.load_if_exists,
         )
 
@@ -68,26 +63,21 @@ class OptunaStudyRunner:
         optuna_logger = OptunaLogger(runinfo)
         logger.set_logger(key=LOGGERS.OPTUNA.value, logger=optuna_logger)
 
-        # Let us try optimize a few parameters, for example the width and the depth of the network:
-        config.n_width = trial.suggest_int("width", 4, 32)
-        config.n_depth = trial.suggest_int("depth", 0, 3)
+        # TODO: Suggest "width" between 4 and 32 and "depth" between 0 and 3:
+        # config.n_width = trial.suggest_...
+        # config.n_depth = trial.suggest...
+        # TODO: run the pipeline:
 
-        self.pipeline.run()
-
-        return self.pipeline.test_metrics.test_loss
+        # TODO: We can get the test loss by self.pipeline.test_metrics.test_loss, return it for optimization!
+        # return ...
 
     def _optimize(self):
 
         # See: configs/optuna.yaml:
         config = self.config
 
-        self.study.optimize(
-            self.objective, n_trials=config.n_trials, timeout=config.timeout
-        )
-
-    def finalize(self):
-
-        return
+        # TODO: Add our objective function, and add the number of trials from our config
+        # self.study.optimize(func=, n_trials=, timeout=config.timeout)
 
 
 def run_project():
@@ -105,14 +95,19 @@ def run_project():
     -FINAL
     """
     config = load_model_config()
-    local_logger = LocalLogger(show_figure=False)
+    local_logger = LocalLogger(
+        show_figure=False
+    )  # TODO: When running the pipeline naked you may set this to true.
 
     pipelinelogger = PipelineLogger()
     pipelinelogger.set_logger(key=LOGGERS.LOCAL.value, logger=local_logger)
 
     pipeline = Pipeline(config=config, logger=pipelinelogger)
-    opt_runner = OptunaStudyRunner(pipeline)
-    opt_runner._optimize()
+
+    # TODO:
+    # opt_runner = OptunaStudyRunner(pipeline)
+
+    pipeline.run()  # <---- replace with: opt_runner._optimize()
 
 
 run_project()
