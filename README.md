@@ -1,4 +1,4 @@
-# Hands on step 4: Connecting to mlflow, starting runs and logging.
+# Hands on step 3: Connecting to mlflow, starting runs and logging.
 
 Now we look at mlflow integration, so ensure that your tracking server is running according to the configuration in config/mlflow.yaml.
 As usual check for TODO's in the files main.py and demo/loggers.py. It is recommended you delete the study in the optuna-dashboard interface, as otherwise it will be continued.
