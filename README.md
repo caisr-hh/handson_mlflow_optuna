@@ -6,9 +6,6 @@ This pipeline relies on loggers collected under a shared pipelinelogger that for
 our baseline. Look at the TODO's in the run_project function in main.py. Try running a single training session with the plotting on
 before disabling it for future runs. 
 
-
-As an Initial step try running the code as is 
-
 Check for TODO's in the files main.py and demo/loggers.py. 
 
 ## Steps:
