@@ -11,10 +11,8 @@ As an Initial step try running the code as is
 
 Check for TODO's in the files main.py and demo/loggers.py. 
 
-##Steps:
-0) This pipeline relies on loggers collected under a shared pipelinelogger that forwards calls. We have a very simple local logger implemented as
- our baseline. Look at the TODO's in the run_project function in main.py. Try running a single training session with the plotting on
- before disabling it for future runs. 
+## Steps:
+0) This pipeline relies on loggers collected under a shared pipelinelogger that forwards calls. We have a very simple local logger implemented as our baseline. Look at the TODO's in the run_project function in main.py. Try running a single training session with the plotting on before disabling it for future runs. 
 1) Instead of running the pipeline directly, pass it to a OptunaStudyRunner.
 2) Look at the initialization of OptunaStudyRunner and implement the necessary changes to set up the study. Note the config described by configs/optuna.yaml.
 3) Go to the objective function (or method in this case) and suggest some integers with .suggest_int(name, low, high) for the width and depth configuration of the pipeline.
