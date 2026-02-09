@@ -24,14 +24,12 @@ class OptunaStudyRunner:
         self.study = None
 
         # See: configs/optuna.yaml:
+        # TODO:Use config to set up pruner
         self.config = load_optuna_config()
         self.config.study.study = OPTUNA_STUDY_NAME
 
-        # Set up a pruner (median pruner):
-        pruner = optuna.pruners.MedianPruner(
-            n_startup_trials=self.config.n_startup_trials,
-            n_warmup_steps=self.config.n_warmup_steps,
-        )
+        # TODO: Set up a pruner (median pruner) with n_startup_trials and n_warmup_steps :
+        # pruner = optuna.pruners.MedianPruner(n_startup_trials=..,n_warmup_steps=...)
 
         # Define our sampler (TPE is by default, but we also set the seed here):
         sampler = optuna.samplers.TPESampler(seed=self.config.study.seed)
@@ -40,7 +38,7 @@ class OptunaStudyRunner:
         self.study = optuna.create_study(
             study_name=self.config.study.study,
             direction="minimize",
-            pruner=pruner,
+            # TODO: pruner=pruner,
             storage=self.config.storage.uri,
             sampler=sampler,
             load_if_exists=self.config.study.load_if_exists,
@@ -74,9 +72,8 @@ class OptunaStudyRunner:
         config.n_width = trial.suggest_int("width", 4, 32)
         config.n_depth = trial.suggest_int("depth", 0, 3)
 
-        # TODO:instead of running the pipeline as below, let us call mlflowdriver with the pipeline (and leave the logger as the default)
-        self.pipeline.run()  # <--- Remove!
-        # mlflowdriver(...)
+        self.pipeline.run()
+
         return self.pipeline.test_metrics.test_loss
 
     def _optimize(self):
@@ -91,28 +88,6 @@ class OptunaStudyRunner:
     def finalize(self):
 
         return
-
-
-def mlflowdriver(pipeline: Pipeline, Logger: MLFlowLogger = MLFlowLogger):
-    mlflow_config = load_mlflow_config()
-    # TODO:Set tracking URI (mlflow_config.tracking_uri)
-    # mlflow.set_tracking_uri(...)
-    # TODO: Set experiment by name (use the constant MLFLOW_EXPERIMENT_NAME)
-    # mlflow.set_experiment(...)
-
-    with mlflow.start_run() as run:
-        runinfo = pipeline.runinfo
-
-        # Gets the runid of the active run
-        runinfo.run_id = run.info.run_id
-        # Initialize logger
-        mlflow_logger = Logger(runinfo)
-
-        pipeline.logger.set_logger(key=LOGGERS.MLFLOW.value, logger=mlflow_logger)
-        # Run pipeline!
-        pipeline.run()
-
-    return pipeline
 
 
 def run_project():

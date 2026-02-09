@@ -1,18 +1,11 @@
-# Hands on step 4: Connecting to mlflow, starting runs and logging.
+# Hands on step 2: Pruning.
 
-Now we look at mlflow integration, so ensure that your tracking server is running according to the configuration in config/mlflow.yaml.
-As usual check for TODO's in the files main.py and demo/loggers.py. It is recommended you delete the study in the optuna-dashboard interface, as otherwise it will be continued.
+Now we attempt to speed up our search by pruning unpromising trials early.
+As before check for TODO's in the files main.py and demo/loggers.py. It is recommended you delete the study in the optuna-dashboard interface, as otherwise it will be continued.
 
 ##Steps:
-1)	Go to the optunarunner.objective function and call mlflowdriver. This defaults to using the MLFlowLogger class.
-2)	Go to the half finished mlflowdriver function and set the tracking and experiment. 
-3)	Let us now go to the loggers and finish implementing the MLFlowLogger class. As the calls to the logger we are interested in occur in the context of an active run, the runid is handled automatically. We will log epoch training loss, test loss and accuracy, model parameters and a figure.
-      Some useful functions are:
-      mlflow.
-            log_metrics(dict,step)
-            log_params(dict)
-            set_tag(key, value)
-            log_figure(fig,artifact_file)
-            log_text(text,artifact_file)
-      
-4)	Try running the code with your tracker server running. Follow the address to make sure your runs are logged and look at their metrics, parameters, tags and artifacts.
+1)    Go to the OptunaStudyRunner and define the pruner in __init__(). Check the parameters n_startup_trials,n_warmup_steps in the loaded optuna config.
+2)	Go to demo/loggers.py and look for the OptunaLogger. In the method that report loss for each training epoch,
+      report this loss using trial.report(). We also need to know when to raise an exception and exit training, so we can poll trial.should_prune().
+      This exception when thrown with context = "pruned" triggers other loggers to handle the interruption.
+3)    Try running the HPO and verify that it is pruning trials. You may also check out the study in the optuna-dashboard.

@@ -132,14 +132,15 @@ class OptunaLogger(Logger):
 
         trial = self.runinfo.trial
         if trial:
-            # Report the loss to let the pruner decide if it is time to prune.
-            trial.report(metrics.epoch_loss, epoch)
+            # TODO: Report the loss to let the pruner decide if it is time to prune.
+            # trial.report(...)
 
-            # Should be prune?
-            if trial.should_prune():
-                # terminate the loop by first raising a generic HaltTraining interruption wit the "pruned" context.
-                # It should then allow the other loggers to exit gracefully before reraising the interruption with the optuna specific
-                raise HaltTraining(context="pruned")
+            # TODO: Should we prune?
+
+            # if trial..
+
+            # raise HaltTraining(context="pruned")
+            pass
 
     def log_interruption(self, context: str):
         # Raise the standard optuna.TrialPruned() error:
@@ -156,40 +157,7 @@ class OptunaLogger(Logger):
 
 
 class MLFlowLogger(Logger):
-
-    def log_epoch(self, metrics: EpochMetrics, epoch: int):
-        # convert the metrics into a dictionary using asdict() and log at step = epoch:
-        metric_dict = asdict(metrics)
-        # mlflow...
-        pass
-
-    def log_test(self, metrics: TestMetrics):
-        # Log test loss and accuracy:
-        metric_dict = asdict(metrics)
-        # mlflow...
-        pass
-
-    def log_figure(self, fig):
-        # Log as boundary.png.
-        # mlflow...
-        pass
-
-    def log_interruption(self, context: str):
-        if context == "pruned":
-            # TODO: Set the "status" tag to "pruned";
-
-            # mlflow...
-            pass
-
-    def log_model(self, model: Module):
-        # TODO: Log the config dictionary as parameters:
-        dict = model.config.dict()
-        # mlflow...
-        # TODO: Log the config as "configs/ModelConfig.yaml"
-        model_string = yaml.dump(model.config.model_dump())
-        # mlflow..
-        # TODO: For grouping purposes we set the tag "status" as "complete":
-        # mlflow...
+    pass
 
 
 class FinalLogger(MLFlowLogger):
