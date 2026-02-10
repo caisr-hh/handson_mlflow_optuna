@@ -1,0 +1,41 @@
+name: ml_tooling_handson
+channels:
+  - conda-forge
+  - nodefaults # be strict: do not include the "defaults" channel
+
+dependencies:
+  # core interpreter
+  - python=3.12
+  # dev & code-quality
+  - mamba
+  - pylint
+  - pytest
+  - pytest-cov
+  - black
+  - isort
+  - mypy
+  - ipykernel
+  - tqdm
+  - gitpython
+  - pydantic>=2.11
+  # science stack
+  - matplotlib
+  - numpy
+  - scipy
+  - pandas
+  - scikit-learn
+  #Model core
+  - pytorch
+  - torchvision
+  # MLOps
+  - mlflow
+  - dvc
+  - optuna
+  - optuna-dashboard
+  - plotly # for optuna visualization
+  - python-kaleido # for plotly
+  # pip
+  - pip
+  - pip:
+      - types-PyYAML
+      - psutil # for system metrics by mlflow
