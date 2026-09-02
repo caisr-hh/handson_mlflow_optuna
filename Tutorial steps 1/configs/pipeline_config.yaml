@@ -2,10 +2,11 @@ model:
   n_width: 26
   n_depth: 1
   learning_rate: 0.001
-  epoch_max: 10
+  epoch_max: 30
   seed: 42
 
 data:
+  table : "workspace.default.circles"
   n_samples: 3000
   noise: 0.03
   factor: 0.8
@@ -14,6 +15,7 @@ data:
   batch_size: 32
 
 logger:
-  local_verbosity: 1
+  verbosity: 1
+  experiment_root : "ECML"
 
 

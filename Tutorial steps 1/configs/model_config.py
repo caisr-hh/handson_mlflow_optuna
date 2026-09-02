@@ -17,7 +17,7 @@ class ModelConfig(BaseModel):
     train_split: float = 0.7
     random_state: int = 42
     batch_size: int = 32
-
+    
 
 class RunInfo(BaseModel):
     run_id: str | None = None

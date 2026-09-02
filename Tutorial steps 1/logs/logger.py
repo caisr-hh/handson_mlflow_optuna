@@ -1,22 +1,33 @@
 from dataclasses import asdict
 
 import mlflow
+import mlflow.pytorch
 import torch
 import yaml
 
-from configs.model_config import RunInfo
-from demo.constants import REGISTERED_MODEL_NAME
-from demo.exceptions import HaltTraining
-from demo.data import EpochMetrics, TestMetrics, construct_data
+from configs.pipeline_config import LoggerConfig, RunInfo
+from misc.constants import REGISTERED_MODEL_NAME 
+from misc.exceptions import HaltTraining
+from misc.util import load_optuna_config
+from data.data import EpochMetrics, TestMetrics, construct_data
 import optuna
 from torch.nn import Module
 import matplotlib.pyplot as plt
-
+from mlflow import MlflowClient
+from optuna.integration import  get_current_trial
 
 class Logger:
-    def __init__(self, runinfo: RunInfo | None = None):
+    def __init__(self, logger_config: LoggerConfig | None = None):
+        self.config = logger_config
+        self.parent = None
+        self.runinfo = None
 
-        self.runinfo = runinfo
+
+    def update_config(self, logger_config: LoggerConfig):
+        self.config = logger_config
+
+    def update_runinfo(self, runinfo : RunInfo):
+        self.runinfo = RunInfo
 
     def log_epoch(self, metrics: EpochMetrics, epoch: int):
         # What to do with the results for each training epoch?
@@ -41,6 +52,8 @@ class Logger:
     def log_interruption(self, context: str):
         # If the model training is interrupted, what do we do?
         pass
+    def log_message(self, message : str, verobosity = 1):
+        pass
 
 
 class PipelineLogger(Logger):
@@ -49,15 +62,27 @@ class PipelineLogger(Logger):
 
     """
 
-    def __init__(self, loggers: dict[str, Logger] = {}):
+    def __init__(self,logger_config: LoggerConfig, loggers: dict[str, Logger] = {}):
 
+        self.config = logger_config
         self.loggers = loggers
+        if self.config is not None:
+            for key in self.loggers.keys():
+                self.loggers[key].parent = self
+                self.loggers[key].update_config(logger_config)
 
     def set_logger(self, key: str, logger: Logger):
         self.loggers[key] = logger
 
     def reset_logger(self):
         self.loggers = {}
+
+
+    def update_runinfo(self, runinfo : RunInfo):
+        self.runinfo = RunInfo
+        for key in self.loggers.keys():
+
+            self.loggers[key].update_runinfo(runinfo)
 
     def log_epoch(self, metrics: EpochMetrics, epoch: int):
         for key in self.loggers.keys():
@@ -96,14 +121,22 @@ class PipelineLogger(Logger):
         for exception in exceptions:
             raise exception
 
+    def log_message(self, message : str, verobosity = 1):
+        if verobosity >= self.config.verbosity:
+            for key in self.loggers.keys():
+
+                self.loggers[key].log_message(message, verobosity)
+
 
 class LocalLogger(Logger):
     """
     The default logger.
-    Prints epoch loss, test results and prints a figure if allowed (toggle off for batch runs).
+    Prints epoch loss, test results..
     """
 
-    def __init__(self, show_figure: bool = True):
+    def __init__(self, logger_config: LoggerConfig | None = None,show_figure: bool = True):
+        self.parent = None
+        self.config = logger_config
         self.show_figure = show_figure
 
     def log_epoch(self, metrics: EpochMetrics, epoch: int):
@@ -119,7 +152,10 @@ class LocalLogger(Logger):
     def log_figure(self, fig):
         if self.show_figure:
             plt.show()
-
+        
+    def log_message(self, message : str, verobosity = 1):
+        if verobosity >= self.config.verbosity:
+            print(message)
 
 class OptunaLogger(Logger):
     """
@@ -130,7 +166,7 @@ class OptunaLogger(Logger):
         # terminate the loop by first raising a generic HaltTraining interruption wit the pruning context.
         # It should then allow the other loggers to exit gracefully before reraising the interruption with the optuna specific error.
 
-        trial = self.runinfo.trial
+        trial = get_current_trial()
         if trial:
             # Report the loss to let the pruner decide if it is time to prune.
             trial.report(metrics.epoch_loss, epoch)
@@ -150,12 +186,13 @@ class OptunaLogger(Logger):
         # Set the trial user attribute "mlflow_run_id" to trial, and add the model config to "config"
         runinfo = self.runinfo
         trial = runinfo.trial
-        if runinfo:
+        if trial:
             trial.set_user_attr("mlflow_run_id", runinfo.run_id)
             trial.set_user_attr("config", model.config.dict())
 
 
 class MLFlowLogger(Logger):
+
 
     def log_epoch(self, metrics: EpochMetrics, epoch: int):
         # convert the metrics into a dictionary using asdict() and log at step = epoch:
@@ -195,19 +232,20 @@ class FinalLogger(MLFlowLogger):
     """
 
     def log_model(self, model: Module):
-
+        model_name = self.config.root + "_model"
         # Log the parameters as usual
         mlflow.log_params(model.config.dict())
         model_string = yaml.dump(model.config.model_dump())
         mlflow.log_text(model_string, artifact_file="configs/ModelConfig.yaml")
 
-        #TODO: Set a the "status" tag to "optimal", identifying this as the optimization winner
 
-
-        # export to a scripted model with torch.jit.script(model)
-        #script_model =
 
         # provide an input example to infer signature.
-        data_example = construct_data(model.config).test_loader.dataset[0:10][0].numpy()
-        # TODO: Register our model. Use registered_model_name=REGISTERED_MODEL_NAME constant for the model registration.
-        #mlflow.pytorch.log_model(pytorch_model, registered_model_name,input_example)
+        input_example = data.get_table_db(model.config).test_loader.dataset[0:10][0].numpy()
+        # Register our model. Use registered_model_name=REGISTERED_MODEL_NAME constant for the model registration.
+        info = mlflow.pytorch.log_model(model, model_name,input_example)
+        #Set a the "status" tag to "optimal", identifying this as the optimization winner
+        client = MlflowClient()
+        client.set_registered_model_alias(name=model_name, alias="contender", version=info.version)
+        
+
