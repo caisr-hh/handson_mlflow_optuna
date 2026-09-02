@@ -1,26 +1,42 @@
+
+#Tutorial repo---------------------------------
 from configs.pipeline_config import PipelineConfig, RunInfo
-import torch
 from models.sample_model import MlpModel
-from data.data import EpochMetrics, TestMetrics, construct_data
+from data.data import EpochMetrics, TestMetrics, construct_data, get_data_db
 from logs.logger import PipelineLogger, Logger
 import logs.logger as loggers
 from misc.util import load_pipeline_config
 from misc.exceptions import HaltTraining
+#----------------------------------------------
 
-import optuna
+# MLFLOW--------------------------------------
 import mlflow
-from pathlib import Path
-from datetime import datetime
-import tempfile
 from mlflow.optuna.storage import MlflowStorage
 from mlflow import MlflowClient
 from mlflow.exceptions import MlflowException, RestException
+#----------------------------------------------
+
+#Optuna----------------------------------------
+import optuna
+#----------------------------------------------
+
+#Torch-----------------------------------------
+import torch
+#----------------------------------------------
+
+#Misc------------------------------------------
+from pathlib import Path
+from datetime import datetime
+import tempfile
+#----------------------------------------------
+
+
 
 class Pipeline():
 
     def __init__(self, config: PipelineConfig):
         self.config = config
-        self.logger = None
+        self.logger = PipelineLogger(loggers = {}, logger_config = config) #Empty logger by default
         self.study = None
         self.data = construct_data(self.config.data)
     def run(self):
@@ -29,28 +45,34 @@ class Pipeline():
             "local":loggers.LocalLogger(),
             }
         self.logger=PipelineLogger(loggers = local_loggers, logger_config = self.config.logger)
-        self.run_instance(is_child = False, is_trial = False)
+        with mlflow.start_run(nested = false) as run:
+            runinfo = RunInfo(
+                run_id = mlflow.active_run().info.run_id
+            )
+            self.logger.update_runinfo(runinfo)
+            self.run_instance()
     
 
     
-    def run_instance(self, is_child = False, is_trial = False):
+    def run_instance(self):
         
-        with mlflow.start_run(nested = is_child) as run:
-            try:
-                self.model = MlpModel(self.config.model)
-                self.train()
-                metrics = self.evaluate()
-                
-                self.save(self.model,metrics)
-                self.logger.log_test(metrics)
 
-            except HaltTraining as error:
-                print("Training halted...")
+        try:
+            self.model = MlpModel(self.config.model)
+            self.train()
+            metrics = self.evaluate()
+            
+            self.save(self.model,metrics)
+            self.logger.log_test(metrics)
+
+        except HaltTraining as error:
+            print("Training halted...")
         return metrics
 
 
 
     def train(self) -> MlpModel:
+        #Shared training process.
 
         optimizer = torch.optim.AdamW(
             self.model.parameters(), lr=self.model.config.learning_rate
@@ -92,6 +114,7 @@ class Pipeline():
 
 
     def evaluate(self):
+        #Shared evaluation process
         self.model.eval()
         loss_function = torch.nn.BCELoss()
         loss_sum = 0
@@ -139,10 +162,11 @@ class Pipeline_HPO(Pipeline):
         self.study = self.setup_study()
 
 
-        pruner = optuna.pruners.MedianPruner(n_startup_trials=5,n_warmup_steps=3)
+        pruner = optuna.pruners.MedianPruner(n_startup_trials=config.hpo.warmup_trials,n_warmup_steps=config.hpo.warmup_steps)
         with mlflow.start_run() as run:
             self.parent_run = run.info.run_id
-            self.study.optimize(self.objective, n_trials=30)
+            self.study.optimize(self.objective, n_trials=config.hpo.trials)
+            
             
         
         return self.get_optimal_parameters()
@@ -151,18 +175,26 @@ class Pipeline_HPO(Pipeline):
         #For the sake of the demo we limit ourselves to one active study.
         storage = MlflowStorage(experiment_id = mlflow.get_experiment_by_name(self.config.logger.experiment_hpo).experiment_id)
         try:
-            optuna.delete_study(study_id=self.config.logger.experiment_hpo)
+            optuna.delete_study(study_name=self.config.logger.study_name)
         except:
             pass
-        study = optuna.create_study(study_name = self.config.logger.experiment_hpo , direction="minimize", storage = storage)
+        study = optuna.create_study(study_name = self.config.logger.study_name , direction="minimize", storage = storage)
         return(study)
         
     def objective(self, trial):
         self.config.model.n_width = trial.suggest_int("n_width", 4,64)
         self.config.model.n_depth = trial.suggest_int("n_depth",0,4)
  
-        
-        metrics = self.run_instance(is_child = True, is_trial = True)
+        with mlflow.start_run(run_name = f"Trial_{trial.number}", nested = True):
+            runinfo = RunInfo(
+                run_id = mlflow.active_run().info.run_id,
+                parent_id = self.parent_run,
+                trial = trial,
+                study = trial.study
+            )
+            self.logger.update_runinfo(runinfo)
+                              
+            metrics = self.run_instance()
 
         trial.set_user_attr("configuration", self.config.dict())
         return metrics.test_loss
@@ -187,7 +219,15 @@ class Pipeline_Retrain(Pipeline):
             "mlflow":loggers.FinalLogger(),
             }
         self.logger=PipelineLogger(loggers = final_loggers, logger_config = self.config.logger)
-        self.run_instance(is_child = False, is_trial = False)
+        with mlflow.start_run() as run:
+            runinfo = RunInfo(
+                run_id = mlflow.active_run().info.run_id,
+                parent_id = None,
+                trial = None,
+                study = None
+            )
+            self.logger.update_runinfo(runinfo)
+            self.run_instance()
 
         #self.compare()
         #self.deploy()
@@ -257,7 +297,7 @@ class Pipeline_Evaluator(Pipeline):
             hpo = client.get_experiment_by_name(self.config.logger.experiment_hpo)
             if hpo is None:
                 mlflow.create_experiment(self.config.logger.experiment_hpo)
-                self.logger.log_messag(f"Experiment {self.config.logger.experiment_hpo} does not exist yet, creating...")
+                self.logger.log_message(f"Experiment {self.config.logger.experiment_hpo} does not exist yet, creating...")
         except MlflowException as e:
             mlflow.create_experiment(self.config.logger.experiment_hpo)
             self.logger.log_message(f"Experiment {self.config.logger.experiment_hpo} does not exist yet, creating...")
@@ -266,13 +306,13 @@ class Pipeline_Evaluator(Pipeline):
     def validate_study(self):
         exp_id = mlflow.get_experiment_by_name(self.config.logger.experiment_hpo).experiment_id
         try:
-            self.study = optuna.load_study(study_name = self.config.logger.experiment_hpo, storage = MlflowStorage(exp_id))
+            self.study = optuna.load_study(study_name = self.config.logger.study_name, storage = MlflowStorage(exp_id))
             return True
         except RestException as e:
             self.logger.log_message("Study does not exist yet.")
             return False
         except Exception as e:
-            self.logger.log_message("Study does not exist yet. ")
+            self.logger.log_message("Study does not exist yet.")
             print(e)
             return False
 
@@ -286,9 +326,9 @@ class Pipeline_Evaluator(Pipeline):
     def get_alias(self, alias):
         client = MlflowClient()
         try:
-            client.get_model_version_by_alias(self.config.model_name, alias)
+            client.get_model_version_by_alias(self.config.logger.model_name, alias)
         except MlflowException as e:
-            logger.log_message("No model with alias {alias} found.")
+            self.logger.log_message(f"No model with alias {alias} found.")
             return None
         
 

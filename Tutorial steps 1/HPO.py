@@ -38,3 +38,23 @@ dbutils.widgets.text("result", "default")
 
 status = dbutils.widgets.get("result")
 print("Hellow world:")
+
+# COMMAND ----------
+
+from configs.pipeline_config import RunInfo
+
+info = RunInfo()
+info.trial
+
+# COMMAND ----------
+
+from mlflow.optuna.storage import MlflowStorage
+import optuna
+import mlflow
+from pipelines import Pipeline_HPO
+from misc.util import load_pipeline_config
+
+config = load_pipeline_config()
+storage = MlflowStorage(experiment_id = mlflow.get_experiment_by_name(config.logger.experiment_hpo).experiment_id)
+
+study = optuna.study.load_study(study_name=config.logger.experiment_hpo,storage=storage)

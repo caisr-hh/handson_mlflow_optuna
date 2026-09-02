@@ -33,6 +33,11 @@ class LoggerConfig(BaseModel):
 
     @computed_field
     @property
+    def study_name(self) -> str:
+        return + self.experiment_root + "_study"
+    
+    @computed_field
+    @property
     def model_name(self) -> str:
         return self.experiment_root + "_model"
     
@@ -47,12 +52,16 @@ class LoggerConfig(BaseModel):
         return "/" + self.experiment_root
     
 
- 
+ class HPOConfig(BaseModel):
+    trials: int = 30
+    warmup_trials: int = 5
+    warmup_steps : int = 3
 
 class PipelineConfig(BaseModel):
     model: ModelConfig
     data: DataConfig
     logger: LoggerConfig
+    hpo: HPOConfig
     
 
 

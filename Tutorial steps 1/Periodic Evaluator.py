@@ -21,10 +21,6 @@ pipeline_config = load_pipeline_config()
 
 # COMMAND ----------
 
-pipeline_config.logger.experiment_train
-
-# COMMAND ----------
-
 from pipelines import Pipeline_Evaluator
 
 pipeline_evaluator = Pipeline_Evaluator(pipeline_config)

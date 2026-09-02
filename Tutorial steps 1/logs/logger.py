@@ -1,20 +1,22 @@
-from dataclasses import asdict
 
-import mlflow
-import mlflow.pytorch
-import torch
-import yaml
 
 from configs.pipeline_config import LoggerConfig, RunInfo
-from misc.constants import REGISTERED_MODEL_NAME 
 from misc.exceptions import HaltTraining
 from misc.util import load_optuna_config
 from data.data import EpochMetrics, TestMetrics, construct_data
-import optuna
-from torch.nn import Module
-import matplotlib.pyplot as plt
+
+import mlflow
+import mlflow.pytorch
 from mlflow import MlflowClient
-from optuna.integration import  get_current_trial
+
+import optuna
+
+import torch
+from torch.nn import Module
+
+from dataclasses import asdict
+import yaml
+import matplotlib.pyplot as plt
 
 class Logger:
     def __init__(self, logger_config: LoggerConfig | None = None):
@@ -27,7 +29,7 @@ class Logger:
         self.config = logger_config
 
     def update_runinfo(self, runinfo : RunInfo):
-        self.runinfo = RunInfo
+        self.runinfo = runinfo
 
     def log_epoch(self, metrics: EpochMetrics, epoch: int):
         # What to do with the results for each training epoch?
@@ -166,7 +168,7 @@ class OptunaLogger(Logger):
         # terminate the loop by first raising a generic HaltTraining interruption wit the pruning context.
         # It should then allow the other loggers to exit gracefully before reraising the interruption with the optuna specific error.
 
-        trial = get_current_trial()
+        trial = self.runinfo.trial
         if trial:
             # Report the loss to let the pruner decide if it is time to prune.
             trial.report(metrics.epoch_loss, epoch)
@@ -242,7 +244,7 @@ class FinalLogger(MLFlowLogger):
 
         # provide an input example to infer signature.
         input_example = data.get_table_db(model.config).test_loader.dataset[0:10][0].numpy()
-        # Register our model. Use registered_model_name=REGISTERED_MODEL_NAME constant for the model registration.
+
         info = mlflow.pytorch.log_model(model, model_name,input_example)
         #Set a the "status" tag to "optimal", identifying this as the optimization winner
         client = MlflowClient()
