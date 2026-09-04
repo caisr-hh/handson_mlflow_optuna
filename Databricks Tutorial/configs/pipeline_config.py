@@ -30,29 +30,42 @@ class LoggerConfig(BaseModel):
 
     experiment_root: str
     verbosity: int = 1
+    #See the catalog setup notebook for how the schema is created
+    schema_model: str = "ecml.models"
 
     @computed_field
     @property
     def study_name(self) -> str:
-        return + self.experiment_root + "_study"
+        return f"{self.experiment_root}_study"
     
     @computed_field
     @property
     def model_name(self) -> str:
-        return self.experiment_root + "_model"
+        return f"{self.experiment_root}_model"
     
     @computed_field
     @property
+    def endpoint_name(self) -> str:
+        return f"{self.experiment_root}_endpoint"
+    
+    @computed_field
+    @property
+    def model_name_uc(self) -> str:
+        return f"{self.schema_model}.{self.experiment_root}_model"
+
+    @computed_field
+    @property
     def experiment_hpo(self) -> str:
-        return "/" + self.experiment_root + "_hpo"
+        return f"/{self.experiment_root}_hpo"
 
     @computed_field
     @property
     def experiment_train(self) -> str:
-        return "/" + self.experiment_root
+        return f"/{self.experiment_root}"
     
 
- class HPOConfig(BaseModel):
+
+class HPOConfig(BaseModel):
     trials: int = 30
     warmup_trials: int = 5
     warmup_steps : int = 3

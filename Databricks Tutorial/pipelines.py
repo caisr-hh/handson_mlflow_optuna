@@ -2,7 +2,7 @@
 #Tutorial repo---------------------------------
 from configs.pipeline_config import PipelineConfig, RunInfo
 from models.sample_model import MlpModel
-from data.data import EpochMetrics, TestMetrics, construct_data, get_data_db
+from data.data import EpochMetrics, TestMetrics, get_data_db
 from logs.logger import PipelineLogger, Logger
 import logs.logger as loggers
 from misc.util import load_pipeline_config
@@ -11,9 +11,11 @@ from misc.exceptions import HaltTraining
 
 # MLFLOW--------------------------------------
 import mlflow
+import mlflow.deployments
 from mlflow.optuna.storage import MlflowStorage
 from mlflow import MlflowClient
 from mlflow.exceptions import MlflowException, RestException
+
 #----------------------------------------------
 
 #Optuna----------------------------------------
@@ -36,9 +38,9 @@ class Pipeline():
 
     def __init__(self, config: PipelineConfig):
         self.config = config
-        self.logger = PipelineLogger(loggers = {}, logger_config = config) #Empty logger by default
+        self.logger = PipelineLogger(loggers = {}, logger_config = config.logger) #Empty logger by default
         self.study = None
-        self.data = construct_data(self.config.data)
+        self.data = get_data_db(self.config.data)
     def run(self):
 
         local_loggers = {
@@ -62,7 +64,7 @@ class Pipeline():
             self.train()
             metrics = self.evaluate()
             
-            self.save(self.model,metrics)
+            self.save(self.model)
             self.logger.log_test(metrics)
 
         except HaltTraining as error:
@@ -115,7 +117,11 @@ class Pipeline():
 
     def evaluate(self):
         #Shared evaluation process
-        self.model.eval()
+        try:
+            self.model.eval()
+        except NotImplementedError: #Hotfix for export in graph format without eval()...
+            pass
+        
         loss_function = torch.nn.BCELoss()
         loss_sum = 0
         n_correct = 0
@@ -132,11 +138,11 @@ class Pipeline():
         accuracy = n_correct / n_samples
         metrics = TestMetrics(test_loss=loss_sum, test_accuracy=accuracy)
         self.test_metrics = metrics
-
+        import pdb;pdb.set_trace()
         return metrics
     
 
-    def save(self, model, metrics, samples = None):
+    def save(self, model):
 
         uid = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S_%f")
         model_name = f"MLP_{uid}"
@@ -145,140 +151,20 @@ class Pipeline():
         model_path.makedir(parents = true, exist_ok = True)
         
         pass
-  
 
-class Pipeline_HPO(Pipeline):
-
-
-    def run(self):
-        mlflow.set_experiment(self.config.logger.experiment_hpo)
-        hpo_loggers = {
-            "local":loggers.LocalLogger(),
-            "mlflow":loggers.MLFlowLogger(),
-            "optuna":loggers.OptunaLogger(),
-            }
-        self.logger=PipelineLogger(loggers = hpo_loggers, logger_config = self.config.logger)
-
-        self.study = self.setup_study()
-
-
-        pruner = optuna.pruners.MedianPruner(n_startup_trials=config.hpo.warmup_trials,n_warmup_steps=config.hpo.warmup_steps)
-        with mlflow.start_run() as run:
-            self.parent_run = run.info.run_id
-            self.study.optimize(self.objective, n_trials=config.hpo.trials)
-            
-            
-        
-        return self.get_optimal_parameters()
-        
-    def setup_study(self):
-        #For the sake of the demo we limit ourselves to one active study.
-        storage = MlflowStorage(experiment_id = mlflow.get_experiment_by_name(self.config.logger.experiment_hpo).experiment_id)
+    def validate_study(self):
+        exp_id = mlflow.get_experiment_by_name(self.config.logger.experiment_hpo).experiment_id
         try:
-            optuna.delete_study(study_name=self.config.logger.study_name)
-        except:
-            pass
-        study = optuna.create_study(study_name = self.config.logger.study_name , direction="minimize", storage = storage)
-        return(study)
+            self.study = optuna.load_study(study_name = self.config.logger.study_name, storage = MlflowStorage(exp_id))
+            return True
+        except RestException as e:
+            self.logger.log_message("Study does not exist yet.")
+            return False
+        except Exception as e:
+            self.logger.log_message("Study does not exist yet.")
+            print(e)
+            return False  
         
-    def objective(self, trial):
-        self.config.model.n_width = trial.suggest_int("n_width", 4,64)
-        self.config.model.n_depth = trial.suggest_int("n_depth",0,4)
- 
-        with mlflow.start_run(run_name = f"Trial_{trial.number}", nested = True):
-            runinfo = RunInfo(
-                run_id = mlflow.active_run().info.run_id,
-                parent_id = self.parent_run,
-                trial = trial,
-                study = trial.study
-            )
-            self.logger.update_runinfo(runinfo)
-                              
-            metrics = self.run_instance()
-
-        trial.set_user_attr("configuration", self.config.dict())
-        return metrics.test_loss
-    
-    def get_optimal_parameters(self):
-        assert self.study is not None, "Run HPO or load an existing study first!"
-        config= PipelineConfig.model_validate(self.study.best_trial.user_attrs["configuration"])
-        return(config)
-
-    def save(model, metrics, parameters = None):
-        pass
-
-
-
-class Pipeline_Retrain(Pipeline):
-
-
-    def run(self):
-        mlflow.set_experiment(self.config.logger.experiment_root)
-        final_loggers = {
-            "local":loggers.LocalLogger(),
-            "mlflow":loggers.FinalLogger(),
-            }
-        self.logger=PipelineLogger(loggers = final_loggers, logger_config = self.config.logger)
-        with mlflow.start_run() as run:
-            runinfo = RunInfo(
-                run_id = mlflow.active_run().info.run_id,
-                parent_id = None,
-                trial = None,
-                study = None
-            )
-            self.logger.update_runinfo(runinfo)
-            self.run_instance()
-
-        #self.compare()
-        #self.deploy()
-    
-
-    def save(model, metrics, parameters = None):
-        #Create a tempdir and save parameters, model source, configuration json.
-        pass
-
-
-
-class Pipeline_Evaluator(Pipeline):
-    def run(self):
-        eval_loggers = {
-            "local":loggers.LocalLogger()
-            }
-        self.logger=PipelineLogger(loggers = eval_loggers, logger_config = self.config.logger)
-
-        #Evaluates the current champion and determines if it needs to be retrained.
-        self.outcome = {
-            "valid" : 0,
-            "retrain": 1,
-            "missing study": 2,
-
-        }
-        self.validate_experiment()
-        study_exists = self.validate_study()
-
-        if study_exists == False:
-            return self.outcome["missing study"]
-        
-        self.model = self.get_alias("champion")
-        
-        if self.model is None:
-            return self.outcome["retrain"]
-        
-
-        metrics = self.evaluate()
-
-
-        #Logged metrics: 
-        client = MlflowClient()
-        run = client.get_run(run_id)
-        old_metrics = run.data.metrics
-        if metrics.loss > 2 * old_metrics["test_loss"][-1]:
-            return self.outcome["retrain"]
-        else:
-            return self.outcome["valid"]
-        
-
-
     def validate_experiment(self):
         client = MlflowClient()
         
@@ -303,47 +189,242 @@ class Pipeline_Evaluator(Pipeline):
             self.logger.log_message(f"Experiment {self.config.logger.experiment_hpo} does not exist yet, creating...")
             
 
-    def validate_study(self):
-        exp_id = mlflow.get_experiment_by_name(self.config.logger.experiment_hpo).experiment_id
+
+
+class Pipeline_HPO(Pipeline):
+
+
+    def run(self):
+        mlflow.set_experiment(self.config.logger.experiment_hpo)
+        hpo_loggers = {
+            "local":loggers.LocalLogger(),
+            "optuna":loggers.OptunaLogger(),
+            }
+        self.logger=PipelineLogger(loggers = hpo_loggers, logger_config = self.config.logger)
+
+        self.study = self.setup_study()
+
+
+        pruner = optuna.pruners.MedianPruner(n_startup_trials=self.config.hpo.warmup_trials,n_warmup_steps=self.config.hpo.warmup_steps)
+
+        self.study.optimize(self.objective, n_trials=self.config.hpo.trial)
+            
+            
+        
+        return self.get_optimal_parameters()
+        
+    def setup_study(self):
+        #For the sake of the demo we limit ourselves to one active study.
+        storage = MlflowStorage(experiment_id = mlflow.get_experiment_by_name(self.config.logger.experiment_hpo).experiment_id)
         try:
-            self.study = optuna.load_study(study_name = self.config.logger.study_name, storage = MlflowStorage(exp_id))
-            return True
-        except RestException as e:
-            self.logger.log_message("Study does not exist yet.")
-            return False
-        except Exception as e:
-            self.logger.log_message("Study does not exist yet.")
-            print(e)
-            return False
+            optuna.delete_study(study_name=self.config.logger.study_name)
+        except:
+            pass
+        study = optuna.create_study(study_name = self.config.logger.study_name , direction="minimize", storage = storage)
+        return(study)
+        
+    def objective(self, trial):
+        self.config.model.n_width = trial.suggest_int("n_width", 4,64)
+        self.config.model.n_depth = trial.suggest_int("n_depth",0,4)
+
+        run_id = trial._trial_id #Note that the mlflow backend means the trial id for optuna is the same as mlflows run id for that trial.
+
+
+        runinfo = RunInfo(
+            run_id = run_id,
+            parent_id = None,
+            trial = trial,
+            study = trial.study
+        )
+        self.logger.update_runinfo(runinfo)
+                            
+        metrics = self.run_instance()
+   
+
+        trial.set_user_attr("configuration", self.config.dict())
+
+        return metrics.test_loss
+    
+    def get_optimal_parameters(self):
+        assert self.study is not None, "Run HPO or load an existing study first!"
+        config= PipelineConfig.model_validate(self.study.best_trial.user_attrs["configuration"])
+        return(config)
+
+    def save(model, metrics, parameters = None):
+        pass
 
 
 
+class Pipeline_Retrain(Pipeline):
+
+
+    def run(self):
+        mlflow.set_experiment(self.config.logger.experiment_train)
+        final_loggers = {
+            "local":loggers.LocalLogger(),
+            "mlflow":loggers.FinalLogger(),
+            }
+        self.logger=PipelineLogger(loggers = final_loggers, logger_config = self.config.logger)
+        assert self.validate_study(), "Please run HPO first!"
+
+        with mlflow.start_run() as run:
+            runinfo = RunInfo(
+                run_id = mlflow.active_run().info.run_id,
+                parent_id = None,
+                trial = None,
+                study = None
+            )
+            self.logger.update_runinfo(runinfo)
+            self.run_instance()
+
+        #self.compare()
+        #self.deploy()
+    
+
+    def save(self, model):
+        self.logger.log_model(model)
+
+
+
+
+class Pipeline_Evaluator(Pipeline):
+    def run(self):
+
+        eval_loggers = {
+            "local":loggers.LocalLogger(),
+            }
+        self.logger=PipelineLogger(loggers = eval_loggers, logger_config = self.config.logger)
+
+        #Evaluates the current champion and determines if it needs to be retrained.
+        self.outcome = {
+            "valid" : 0,
+            "retrain": 1,
+            "missing study": 2,
+
+        }
+        self.validate_experiment()
+        study_exists = self.validate_study()
+        if study_exists == False:
+            return self.outcome["missing study"]
+        
+        #Gets models and version infos from registered model aliases!
+        self.model = self.get_alias_model("champion")
+        self.info = self.get_alias_version("champion")
+        run_id = self.info.run_id
+
+        
+        if self.model is None:
+            return self.outcome["retrain"]
+        
+
+        metrics = self.evaluate()
+
+
+        #Logged metrics: 
+        client = MlflowClient()
+        run = client.get_run(run_id)
+        old_metrics = run.data.metrics
+ 
+        if metrics.test_loss > 1.2 * old_metrics["test_loss"]: # todo: add constant to config
+            return self.outcome["retrain"]
+        else:
+            return self.outcome["valid"]
+        
+    def get_alias_model(self, alias):
+        client = MlflowClient()
+        try:
+            model = mlflow.pytorch.load_model(model_uri=f"models:/{self.config.logger.model_name_uc}@{alias}")
+            
+            return model
+        except MlflowException as e:
+            self.logger.log_message(f"No model with alias {alias} found.")
+            return None
+
+    def get_alias_version(self, alias):
+        client = MlflowClient()
+        try:
+            model = client.get_model_version_by_alias(self.config.logger.model_name_uc, alias)
+
+            return model
+        except MlflowException as e:
+            self.logger.log_message(f"No model with alias {alias} found.")
+            return None
 
     def get_run(self, runid):
         #Fetch models from experiment.
         pass
 
-    def get_alias(self, alias):
-        client = MlflowClient()
-        try:
-            client.get_model_version_by_alias(self.config.logger.model_name, alias)
-        except MlflowException as e:
-            self.logger.log_message(f"No model with alias {alias} found.")
-            return None
-        
 
 
-
-class Promotion_Pipeline(Pipeline_Evaluator):
+class Pipeline_Deploy(Pipeline_Evaluator):
     def run(self):
         #Evaluates the current champion and determines if it needs to be retrained.
-        self.model = self.get_champion()
-        metrics = self.evaluate()
+        update = self.compete()
+        if update:
+            self.promote()
+            self.deploy()
+        
+        return update
 
+    def compete(self) -> bool:
+        #Compares the current champion and the condender, returning True if the contender should be promoted and deployed.
+        self.model = self.get_alias_model("champion")
+        if self.model != None:
+            #Get and evaluate model on new data
 
-    def compete(self):
-        #Pitch a challenger against the current champion and promote it if it wins.
-        pass
+            metrics_old = self.evaluate()
+            self.model = self.get_alias_model("contender")
+            assert self.model is not None, "Contender not found, nothing to promote!"
+            metrics_new = self.evaluate()
+            if metrics_new.test_loss < metrics_old.test_loss:
+                return(True)
+            else:
+                self.logger.log_message("Contender did not beat the champion, keeping champion.")
+                return(False)
+        else:
+
+            self.model = self.get_alias_model("contender")
+            assert self.model is not None, "Contender not found, nothing to promote."
+            return(True) #No existing champion, victory by default.
+    def promote(self):
+        #Promote the contender to champion
+        client = MlflowClient()
+        info = self.get_alias_version("contender")
+        client.set_registered_model_alias(name=info.name, alias="champion", version=info.version)
+        client.delete_registered_model_alias(name=info.name, alias="contender")
+        self.logger.log_message(f"Promoted model {info.name} version {info.version} to champion.")
+    def deploy(self):
+        #Deploy the model to a serving endpoint
+        deploy_client = mlflow.deployments.get_deploy_client("databricks")
+        endpoint = None
+        info = self.get_alias_version("champion")
+        config = {
+            "served_entities":[
+                {
+                    "entity_name": self.config.logger.model_name_uc,
+                    "entity_version": info.version,
+                    "scale_to_zero_enabled":True,
+                    "workload_size": "Small"
+
+                }
+            ]
+        }
+        try:
+            endpoint = deploy_client.get_endpoint(self.config.logger.endpoint_name)
+
+        except:
+            self.logger.log_message("Unable to find existing endpoint, creating new...")
+
+        if endpoint is None:
+            self.logger.log_message("Creating new endpoint...")
+            deploy_client.create_endpoint(self.config.logger.endpoint_name, config)
+        else:
+            self.logger.log_message("Updating existing endpoint")
+            deploy_client.update_endpoint(self.config.logger.endpoint_name, config)
+        self.logger.log_message(f"Deployed model {info.name} version {info.version} to endpoint {self.config.logger.endpoint_name}.")
+
+        
+
 
 
 

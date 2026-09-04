@@ -4,7 +4,7 @@
 # base_environment = "databricks_ml_v5"
 # environment_version = "5"
 # dependencies = [
-#   "mlflow>=3.1",
+#   "-r '/Workspace/Users/mikael.andersson@hh.se/ECML WIP/Tutorial steps 1/requirements.txt'",
 # ]
 # ///
 # MAGIC %load_ext autoreload
@@ -17,18 +17,11 @@ from misc.util import load_pipeline_config
 from configs.pipeline_config import PipelineConfig
 pipeline_config = load_pipeline_config()
 
-import data.data as data
-data.generate_data_db(pipeline_config.data)
+from pipelines import Pipeline_Evaluator
 
-# COMMAND ----------
+pipeline_evaluator = Pipeline_Evaluator(pipeline_config)
+result = pipeline_evaluator.run()
 
-from misc.util import load_pipeline_config
 
-from configs.pipeline_config import PipelineConfig
-pipeline_config = load_pipeline_config()
-
-import data.data as data
-model_data = data.get_data_db(pipeline_config.data)
-
-# COMMAND ----------
-
+#Sets a task value for this notebook, used for flow control in databricks jobs!
+dbutils.jobs.taskValues.set("result", result)

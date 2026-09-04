@@ -2,11 +2,11 @@ model:
   n_width: 26
   n_depth: 1
   learning_rate: 0.001
-  epoch_max: 5
+  epoch_max: 30
   seed: 42
 
 data:
-  table : "workspace.default.circles"
+  table : "ecml.data.tutorial_data"
   n_samples: 3000
   noise: 0.03
   factor: 0.8
@@ -16,10 +16,10 @@ data:
 
 logger:
   verbosity: 1
-  experiment_root : "ECML"
+  experiment_root : "ecml"
 
 hpo: 
-  trials: 10
+  trials: 30
   warmup_trials: 5
   warmup_steps : 2
 

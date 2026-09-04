@@ -79,10 +79,14 @@ def generate_data_db(config: DataConfig) -> ModelData:
     input_train, input_test, label_train, label_test = train_test_split(
         input, labels, train_size=config.train_split, random_state=config.random_state
     )
-    drift_x = np.random.normal(0, 1, 1)
-    drift_y = np.random.normal(0, 1, 1)
+    #drift_x = np.random.normal(0, 1, 1)
+    #drift_y = np.random.normal(0, 1, 1)
+    drift_x = np.random.rand()*5
+    drift_y = np.random.rand()*5
     input_test[:,0] = input_test[:,0] + drift_x
     input_test[:,1] = input_test[:,1] + drift_y
+    input_train[:,0] = input_train[:,0] + drift_x
+    input_train[:,1] = input_train[:,1] + drift_y
 
     df_train = pd.DataFrame(input_train, columns=["x", "y"])
     df_test = pd.DataFrame(input_test, columns=["x", "y"])
@@ -95,12 +99,12 @@ def generate_data_db(config: DataConfig) -> ModelData:
     df_full = pd.concat([df_train, df_test], axis=0)
     spark = SparkSession.getActiveSession()
     sdf = spark.createDataFrame(df_full)
-    sdf.write.mode("overwrite").saveAsTable("workspace.default.circles")
+    sdf.write.mode("overwrite").saveAsTable(config.table)
     return
 
 def get_data_db(config: DataConfig) -> ModelData:
     spark = SparkSession.getActiveSession()
-    sdf = spark.table("workspace.default.circles")
+    sdf = spark.table(config.table)
     pdf = sdf.toPandas()
     input_train = pdf[pdf["set"] == 0][["x", "y"]].values
     input_test = pdf[pdf["set"] == 1][["x", "y"]].values

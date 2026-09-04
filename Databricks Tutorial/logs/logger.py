@@ -2,12 +2,13 @@
 
 from configs.pipeline_config import LoggerConfig, RunInfo
 from misc.exceptions import HaltTraining
-from misc.util import load_optuna_config
-from data.data import EpochMetrics, TestMetrics, construct_data
+from misc.util import load_optuna_config, load_pipeline_config
+from data.data import EpochMetrics, TestMetrics, construct_data, get_data_db
 
 import mlflow
 import mlflow.pytorch
 from mlflow import MlflowClient
+from mlflow.models import infer_signature
 
 import optuna
 
@@ -169,9 +170,11 @@ class OptunaLogger(Logger):
         # It should then allow the other loggers to exit gracefully before reraising the interruption with the optuna specific error.
 
         trial = self.runinfo.trial
+
         if trial:
             # Report the loss to let the pruner decide if it is time to prune.
             trial.report(metrics.epoch_loss, epoch)
+            
 
             # Should be prune?
             if trial.should_prune():
@@ -186,6 +189,9 @@ class OptunaLogger(Logger):
 
     def log_model(self, model: Module):
         # Set the trial user attribute "mlflow_run_id" to trial, and add the model config to "config"
+        pass
+
+        
         runinfo = self.runinfo
         trial = runinfo.trial
         if trial:
@@ -223,31 +229,71 @@ class MLFlowLogger(Logger):
 
 
 class FinalLogger(MLFlowLogger):
-    """
-    This logger only needs a different log_model method to its parent class,
-    turning the model into a scripted model with less source code and dependencies to handle.
 
-    It then registers a tag in mlflow that identifies that this is the optimal
-
-    This way we avoid bloating the registry, and we can register our first model.
-    In this example we will promote it to the registry directly.
-    """
 
     def log_model(self, model: Module):
-        model_name = self.config.root + "_model"
+        model_name = self.config.model_name_uc
         # Log the parameters as usual
         mlflow.log_params(model.config.dict())
+
+        #Include a yaml copy of the model config
         model_string = yaml.dump(model.config.model_dump())
         mlflow.log_text(model_string, artifact_file="configs/ModelConfig.yaml")
 
+        # todo: Log entire pipeline config
+        
 
 
         # provide an input example to infer signature.
-        input_example = data.get_table_db(model.config).test_loader.dataset[0:10][0].numpy()
+        dataconfig = load_pipeline_config().data
+        input_example = get_data_db(dataconfig).test_loader.dataset[0:10][0]
+        with torch.no_grad():
+            output_example = model(input_example)
+        signature = infer_signature(input_example.numpy(), output_example.numpy())
 
-        info = mlflow.pytorch.log_model(model, model_name,input_example)
+
+
+        info = mlflow.pytorch.log_model(model, registered_model_name=model_name,input_example=input_example.numpy())
         #Set a the "status" tag to "optimal", identifying this as the optimization winner
         client = MlflowClient()
-        client.set_registered_model_alias(name=model_name, alias="contender", version=info.version)
+        client.set_registered_model_alias(name=model_name, alias="contender", version=int(info.registered_model_version))
+        
+class ONNXLogger(MLFlowLogger):
+
+
+    def log_model(self, model: Module):
+        model_name = self.config.model_name_uc
+        # Log the parameters as usual
+        mlflow.log_params(model.config.dict())
+
+        #Include a yaml copy of the model config
+        model_string = yaml.dump(model.config.model_dump())
+        mlflow.log_text(model_string, artifact_file="configs/ModelConfig.yaml")
+
+        # todo: Log entire pipeline config
         
 
+
+        # provide an input example to infer signature.
+        dataconfig = load_pipeline_config().data
+        input_example = get_data_db(dataconfig).test_loader.dataset[0:10][0]
+        with torch.no_grad():
+            output_example = model(input_example)
+        signature = infer_signature(input_example.numpy(), output_example.numpy())
+
+        # Log the model as an onnx model
+
+        onnx_program = torch.onnx.export(model, 
+                                        input_example,
+                                        f = None,
+                                        dynamic_shapes = {"in_tensor":{0:"batch_size"}}
+                                        )
+
+
+        onnx_model = onnx_program.model_proto
+        info = mlflow.onnx.log_model(onnx_model, registered_model_name=model_name,signature=signature)
+
+
+        #Set a the "status" tag to "optimal", identifying this as the optimization winner
+        client = MlflowClient()
+        client.set_registered_model_alias(name=model_name, alias="contender", version=int(info.registered_model_version))
