@@ -79,14 +79,13 @@ def generate_data_db(config: DataConfig) -> ModelData:
     input_train, input_test, label_train, label_test = train_test_split(
         input, labels, train_size=config.train_split, random_state=config.random_state
     )
-    #drift_x = np.random.normal(0, 1, 1)
-    #drift_y = np.random.normal(0, 1, 1)
-    drift_x = np.random.rand()*5
-    drift_y = np.random.rand()*5
-    input_test[:,0] = input_test[:,0] + drift_x
-    input_test[:,1] = input_test[:,1] + drift_y
-    input_train[:,0] = input_train[:,0] + drift_x
-    input_train[:,1] = input_train[:,1] + drift_y
+
+    scale_x = (5*np.random.rand()+1)/6
+    scale_y = (5*np.random.rand()+1)/6
+    input_test[:,0] = input_test[:,0] * scale_x
+    input_test[:,1] = input_test[:,1] * scale_y
+    input_train[:,0] = input_train[:,0] * scale_x
+    input_train[:,1] = input_train[:,1] * scale_y
 
     df_train = pd.DataFrame(input_train, columns=["x", "y"])
     df_test = pd.DataFrame(input_test, columns=["x", "y"])

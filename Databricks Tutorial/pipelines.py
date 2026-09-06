@@ -138,7 +138,7 @@ class Pipeline():
         accuracy = n_correct / n_samples
         metrics = TestMetrics(test_loss=loss_sum, test_accuracy=accuracy)
         self.test_metrics = metrics
-        import pdb;pdb.set_trace()
+
         return metrics
     
 
@@ -207,7 +207,7 @@ class Pipeline_HPO(Pipeline):
 
         pruner = optuna.pruners.MedianPruner(n_startup_trials=self.config.hpo.warmup_trials,n_warmup_steps=self.config.hpo.warmup_steps)
 
-        self.study.optimize(self.objective, n_trials=self.config.hpo.trial)
+        self.study.optimize(self.objective, n_trials=self.config.hpo.trials)
             
             
         
@@ -325,13 +325,15 @@ class Pipeline_Evaluator(Pipeline):
         run = client.get_run(run_id)
         old_metrics = run.data.metrics
  
-        if metrics.test_loss > 1.2 * old_metrics["test_loss"]: # todo: add constant to config
+        if metrics.test_loss > self.config.retrain_threshold * old_metrics["test_loss"]: # todo: add constant to config
+            self.logger.log_message(f"Current champion model has a test loss of {old_metrics['test_loss']}, new model has a test loss of {metrics.test_loss}. Retraining required.")
             return self.outcome["retrain"]
+            
         else:
+            self.logger.log_message(f"Current champion model has a test loss of {old_metrics['test_loss']}, new model has a test loss of {metrics.test_loss}. Retraining not required.")
             return self.outcome["valid"]
         
     def get_alias_model(self, alias):
-        client = MlflowClient()
         try:
             model = mlflow.pytorch.load_model(model_uri=f"models:/{self.config.logger.model_name_uc}@{alias}")
             
@@ -343,9 +345,9 @@ class Pipeline_Evaluator(Pipeline):
     def get_alias_version(self, alias):
         client = MlflowClient()
         try:
-            model = client.get_model_version_by_alias(self.config.logger.model_name_uc, alias)
+            info = client.get_model_version_by_alias(self.config.logger.model_name_uc, alias)
 
-            return model
+            return info
         except MlflowException as e:
             self.logger.log_message(f"No model with alias {alias} found.")
             return None

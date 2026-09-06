@@ -21,7 +21,7 @@ logger:
 hpo: 
   trials: 30
   warmup_trials: 5
-  warmup_steps : 2
+  warmup_steps: 2
 
-
+retrain_threshold: 1.25
 

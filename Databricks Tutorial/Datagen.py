@@ -4,7 +4,7 @@
 # base_environment = "databricks_ml_v5"
 # environment_version = "5"
 # dependencies = [
-#   "mlflow>=3.1",
+#   "-r '/Workspace/Shared/ECML WIP/Databricks Tutorial/requirements.txt'",
 # ]
 # ///
 # MAGIC %load_ext autoreload

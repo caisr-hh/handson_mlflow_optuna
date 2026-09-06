@@ -75,6 +75,8 @@ class PipelineConfig(BaseModel):
     data: DataConfig
     logger: LoggerConfig
     hpo: HPOConfig
+    retrain_threshold: float = 1.25
+    
     
 
 

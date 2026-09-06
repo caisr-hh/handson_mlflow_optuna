@@ -4,17 +4,12 @@
 # base_environment = "databricks_ml_v5"
 # environment_version = "5"
 # dependencies = [
-#   "-r '/Workspace/Users/mikael.andersson@hh.se/ECML WIP/Tutorial steps 1/requirements.txt'",
+#   "-r '/Workspace/Shared/ECML WIP/Databricks Tutorial/requirements.txt'",
 # ]
 # ///
+# DBTITLE 1,Autoreload
 # MAGIC %load_ext autoreload
 # MAGIC %autoreload 2
-
-# COMMAND ----------
-
-import mlflow
-
-mymodel = mlflow.pyfunc.load_model("models:/ecml.models.ecml_model@contender")
 
 # COMMAND ----------
 
