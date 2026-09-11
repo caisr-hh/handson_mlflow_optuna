@@ -32,15 +32,11 @@ import logging
 logging.getLogger('mlflow.tracking.context.registry').setLevel(logging.ERROR)
 
 from pipelines import Pipeline_HPO
-from misc.util import load_pipeline_config
 
 from configs.pipeline_config import PipelineConfig
 import mlflow
 
-
-config = load_pipeline_config()
-
-
+config = PipelineConfig.from_file("configs/pipeline_config.yaml")
 
 
 pipeline = Pipeline_HPO(config)

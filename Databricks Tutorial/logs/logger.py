@@ -189,9 +189,6 @@ class OptunaLogger(Logger):
 
     def log_model(self, model: Module):
         # Set the trial user attribute "mlflow_run_id" to trial, and add the model config to "config"
-        pass
-
-        
         runinfo = self.runinfo
         trial = runinfo.trial
         if trial:
@@ -240,7 +237,6 @@ class FinalLogger(MLFlowLogger):
         model_string = yaml.dump(model.config.model_dump())
         mlflow.log_text(model_string, artifact_file="configs/ModelConfig.yaml")
 
-        # todo: Log entire pipeline config
         
 
 
@@ -258,42 +254,3 @@ class FinalLogger(MLFlowLogger):
         client = MlflowClient()
         client.set_registered_model_alias(name=model_name, alias="contender", version=int(info.registered_model_version))
         
-class ONNXLogger(MLFlowLogger):
-
-
-    def log_model(self, model: Module):
-        model_name = self.config.model_name_uc
-        # Log the parameters as usual
-        mlflow.log_params(model.config.dict())
-
-        #Include a yaml copy of the model config
-        model_string = yaml.dump(model.config.model_dump())
-        mlflow.log_text(model_string, artifact_file="configs/ModelConfig.yaml")
-
-        # todo: Log entire pipeline config
-        
-
-
-        # provide an input example to infer signature.
-        dataconfig = load_pipeline_config().data
-        input_example = get_data_db(dataconfig).test_loader.dataset[0:10][0]
-        with torch.no_grad():
-            output_example = model(input_example)
-        signature = infer_signature(input_example.numpy(), output_example.numpy())
-
-        # Log the model as an onnx model
-
-        onnx_program = torch.onnx.export(model, 
-                                        input_example,
-                                        f = None,
-                                        dynamic_shapes = {"in_tensor":{0:"batch_size"}}
-                                        )
-
-
-        onnx_model = onnx_program.model_proto
-        info = mlflow.onnx.log_model(onnx_model, registered_model_name=model_name,signature=signature)
-
-
-        #Set a the "status" tag to "optimal", identifying this as the optimization winner
-        client = MlflowClient()
-        client.set_registered_model_alias(name=model_name, alias="contender", version=int(info.registered_model_version))

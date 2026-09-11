@@ -14,8 +14,9 @@
 
 from misc.util import load_pipeline_config
 
-from configs.pipeline_config import PipelineConfig
-pipeline_config = load_pipeline_config()
+from configs.datagen_config import DatagenConfig
+config = DatagenConfig.from_file()
+
 
 import data.data as data
-data.generate_data_db(pipeline_config.data)
+data.generate_data_db(config)

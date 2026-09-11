@@ -7,6 +7,7 @@ from logs.logger import PipelineLogger, Logger
 import logs.logger as loggers
 from misc.util import load_pipeline_config
 from misc.exceptions import HaltTraining
+from misc.plots import plot_res
 #----------------------------------------------
 
 # MLFLOW--------------------------------------
@@ -47,7 +48,7 @@ class Pipeline():
             "local":loggers.LocalLogger(),
             }
         self.logger=PipelineLogger(loggers = local_loggers, logger_config = self.config.logger)
-        with mlflow.start_run(nested = false) as run:
+        with mlflow.start_run(nested = False) as run:
             runinfo = RunInfo(
                 run_id = mlflow.active_run().info.run_id
             )
@@ -63,8 +64,9 @@ class Pipeline():
             self.model = MlpModel(self.config.model)
             self.train()
             metrics = self.evaluate()
-            
+            fig = plot_res(self.model,self.data)
             self.save(self.model)
+            self.logger.log_figure(fig)
             self.logger.log_test(metrics)
 
         except HaltTraining as error:
@@ -126,6 +128,7 @@ class Pipeline():
         loss_sum = 0
         n_correct = 0
         n_samples = 0
+
         for batch_input, batch_labels in self.data.test_loader:
             prediction = self.model(batch_input)
             loss = loss_function(prediction, batch_labels)
@@ -134,8 +137,10 @@ class Pipeline():
             n_samples += len(classifications)
 
             loss_sum += loss.item()
+
         loss_sum = loss_sum / len(self.data.test_loader)
         accuracy = n_correct / n_samples
+        
         metrics = TestMetrics(test_loss=loss_sum, test_accuracy=accuracy)
         self.test_metrics = metrics
 
@@ -143,16 +148,9 @@ class Pipeline():
     
 
     def save(self, model):
-
-        uid = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S_%f")
-        model_name = f"MLP_{uid}"
-        model_path = path.Path("checkpoints") / model_name
-        
-        model_path.makedir(parents = true, exist_ok = True)
-        
         pass
 
-    def validate_study(self):
+    def load_study(self):
         exp_id = mlflow.get_experiment_by_name(self.config.logger.experiment_hpo).experiment_id
         try:
             self.study = optuna.load_study(study_name = self.config.logger.study_name, storage = MlflowStorage(exp_id))
@@ -164,7 +162,8 @@ class Pipeline():
             self.logger.log_message("Study does not exist yet.")
             print(e)
             return False  
-        
+    
+    
     def validate_experiment(self):
         client = MlflowClient()
         
@@ -188,7 +187,14 @@ class Pipeline():
             mlflow.create_experiment(self.config.logger.experiment_hpo)
             self.logger.log_message(f"Experiment {self.config.logger.experiment_hpo} does not exist yet, creating...")
             
+    def get_optimal_parameters(self):
+        #We can get the best trial (frozen) from omptuna and load parameters from there
+        assert self.study is not None, "Run HPO or load an existing study first!"
+        trial = self.study.best_trial
+        self.config.model.n_width = trial.params["n_width"]
+        self.config.model.n_depth = trial.params["n_depth"]
 
+        return(self.config.model)
 
 
 class Pipeline_HPO(Pipeline):
@@ -245,10 +251,7 @@ class Pipeline_HPO(Pipeline):
 
         return metrics.test_loss
     
-    def get_optimal_parameters(self):
-        assert self.study is not None, "Run HPO or load an existing study first!"
-        config= PipelineConfig.model_validate(self.study.best_trial.user_attrs["configuration"])
-        return(config)
+
 
     def save(model, metrics, parameters = None):
         pass
@@ -265,7 +268,8 @@ class Pipeline_Retrain(Pipeline):
             "mlflow":loggers.FinalLogger(),
             }
         self.logger=PipelineLogger(loggers = final_loggers, logger_config = self.config.logger)
-        assert self.validate_study(), "Please run HPO first!"
+        assert self.load_study(), "Please run HPO first!"
+        self.config.model = self.get_optimal_parameters()
 
         with mlflow.start_run() as run:
             runinfo = RunInfo(
@@ -303,18 +307,21 @@ class Pipeline_Evaluator(Pipeline):
 
         }
         self.validate_experiment()
-        study_exists = self.validate_study()
+        study_exists = self.load_study()
         if study_exists == False:
             return self.outcome["missing study"]
         
         #Gets models and version infos from registered model aliases!
         self.model = self.get_alias_model("champion")
         self.info = self.get_alias_version("champion")
-        run_id = self.info.run_id
 
-        
+        #Study exists but no champion, interrupted pipeline, retrain:
         if self.model is None:
             return self.outcome["retrain"]
+
+
+        
+
         
 
         metrics = self.evaluate()
@@ -322,15 +329,13 @@ class Pipeline_Evaluator(Pipeline):
 
         #Logged metrics: 
         client = MlflowClient()
+        run_id = self.info.run_id
         run = client.get_run(run_id)
         old_metrics = run.data.metrics
  
         if metrics.test_loss > self.config.retrain_threshold * old_metrics["test_loss"]: # todo: add constant to config
-            self.logger.log_message(f"Current champion model has a test loss of {old_metrics['test_loss']}, new model has a test loss of {metrics.test_loss}. Retraining required.")
             return self.outcome["retrain"]
-            
         else:
-            self.logger.log_message(f"Current champion model has a test loss of {old_metrics['test_loss']}, new model has a test loss of {metrics.test_loss}. Retraining not required.")
             return self.outcome["valid"]
         
     def get_alias_model(self, alias):

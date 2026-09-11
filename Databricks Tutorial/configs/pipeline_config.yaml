@@ -7,12 +7,8 @@ model:
 
 data:
   table : "ecml.data.tutorial_data"
-  n_samples: 3000
-  noise: 0.03
-  factor: 0.8
-  train_split: 0.7
-  random_state: 42
   batch_size: 32
+  version: -1
 
 logger:
   verbosity: 1

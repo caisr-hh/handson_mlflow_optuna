@@ -1,9 +1,9 @@
 import torch
 
-from configs.model_config import RunInfo, ModelConfig
+from configs.pipeline_config import RunInfo, ModelConfig
 from torch import nn
 import yaml
-from demo.constants import CONFIG_DIR
+
 
 
 class MlpModel(nn.Module):

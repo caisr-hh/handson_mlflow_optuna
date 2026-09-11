@@ -10,11 +10,16 @@ import yaml
 import pandas as pd
 from pyspark.sql import SparkSession
 import numpy as np
+import logging
+
+logging.getLogger("pyspark.sql.connect").setLevel(logging.ERROR)
 
 class ModelData(BaseModel):
+    
     config: DataConfig
     training_loader: Any
     test_loader: Any
+
 
 
 @dataclass
@@ -103,7 +108,14 @@ def generate_data_db(config: DataConfig) -> ModelData:
 
 def get_data_db(config: DataConfig) -> ModelData:
     spark = SparkSession.getActiveSession()
-    sdf = spark.table(config.table)
+
+    
+    if config.version < 0:
+
+        latest_version = spark.sql(f"DESCRIBE HISTORY {config.table}").select("version").first()[0]
+        config.version = latest_version
+
+    sdf = spark.read.option("VersionAsOf", config.version).table(config.table)
     pdf = sdf.toPandas()
     input_train = pdf[pdf["set"] == 0][["x", "y"]].values
     input_test = pdf[pdf["set"] == 1][["x", "y"]].values

@@ -3,9 +3,6 @@
 # [tool.databricks.environment]
 # base_environment = "databricks_ml_v5"
 # environment_version = "5"
-# dependencies = [
-#   "-r '/Workspace/Shared/ECML WIP/Databricks Tutorial/requirements.txt'",
-# ]
 # ///
 # DBTITLE 1,Autoreload
 # MAGIC %load_ext autoreload
@@ -29,15 +26,26 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Run evaluation component
-from misc.util import load_pipeline_config
+# DBTITLE 1,Suppress warnings
+import warnings
+import logging
 
+# Suppress PySpark Spark Connect logging warnings
+logging.getLogger("pyspark.sql.connect.logging").setLevel(logging.ERROR)
+
+# Suppress PyTorch buffer warnings
+warnings.filterwarnings('ignore', category=UserWarning, module='torch.export.pt2_archive._package')
+
+# COMMAND ----------
+
+# DBTITLE 1,Run evaluation component
 from configs.pipeline_config import PipelineConfig
-pipeline_config = load_pipeline_config()
 
 from pipelines import Pipeline_Evaluator
 
-pipeline_evaluator = Pipeline_Evaluator(pipeline_config)
+config = PipelineConfig.from_file("configs/pipeline_config.yaml")
+
+pipeline_evaluator = Pipeline_Evaluator(config)
 result = pipeline_evaluator.run()
 
 
