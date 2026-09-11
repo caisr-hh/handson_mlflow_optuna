@@ -57,6 +57,13 @@ class Pipeline():
         #And here we log the test...
         mlflow.log_metrics(asdict(metrics))
 
+        #Let us set a tag in case we need additional identification:
+        mlflow.set_tags({
+            "model": "mlp",
+            "project": "ecml",
+            "data": "circles"
+        })
+
 
         # Let us log a figure of our results.
         figure = plot_res(self.model,self.data)

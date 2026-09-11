@@ -5,7 +5,7 @@ channels:
   - conda-forge
 
 dependencies:
-  - python=3.11
+  - python=3.10
 
   - mlflow=3.9.0
   - optuna=4.7.0
@@ -16,4 +16,5 @@ dependencies:
   - scikit-learn=1.7.2
   - onnx=1.22.0
   - onnxruntime=1.29.0
-  - onnxscript==0.7.2
+  - onnxscript
+  - optuna-dashboard

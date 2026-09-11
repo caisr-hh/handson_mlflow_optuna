@@ -1,6 +1,7 @@
 import optuna
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+import matplotlib as mpl
 
 cmap = cm.viridis
 
@@ -26,7 +27,7 @@ def objective(trial : optuna.Trial):
     _m = trial.suggest_float("m", 0, 1)
 
     _dist = (x*_k + _m - y)
-    mse = sum(abs(dist - _dist))**2/n_samples
+
     _class =  (x*_k + _m > y).astype(float)
     accuracy = sum(abs(labels-_class))/n_samples
     return accuracy
@@ -49,6 +50,8 @@ for trial in study.trials:
 
     plt.plot(_x, _y, color = cmap(trial.number/n_trials), alpha = 0.5)
 
+norm = mpl.colors.Normalize(vmin=0, vmax=n_trials)
+sm = mpl.cm.ScalarMappable(cmap=cmap, norm=norm)
 
 _x = np.array([0, 1])
 _y = np.array([m, k + m])

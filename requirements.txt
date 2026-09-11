@@ -1,0 +1,11 @@
+mlflow=3.9.0
+optuna=4.7.0
+pytorch=2.10
+pydantic=2.12.5
+matplotlib=3.10.8
+numpy=2.2.6
+scikit-learn=1.7.2
+onnx=1.22.0
+onnxruntime=1.29.0
+onnxscript
+optuna-dashboard
