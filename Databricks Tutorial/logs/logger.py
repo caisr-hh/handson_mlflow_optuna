@@ -1,21 +1,35 @@
-from dataclasses import asdict
+
+
+from configs.pipeline_config import LoggerConfig, RunInfo
+from misc.exceptions import HaltTraining
+from misc.util import load_optuna_config, load_pipeline_config
+from data.data import EpochMetrics, TestMetrics, construct_data, get_data_db
 
 import mlflow
-import torch
-import yaml
+import mlflow.pytorch
+from mlflow import MlflowClient
+from mlflow.models import infer_signature
 
-from configs.model_config import RunInfo
-from demo.constants import REGISTERED_MODEL_NAME
-from demo.exceptions import HaltTraining
-from demo.data import EpochMetrics, TestMetrics, construct_data
 import optuna
+
+import torch
 from torch.nn import Module
+
+from dataclasses import asdict
+import yaml
 import matplotlib.pyplot as plt
 
-
 class Logger:
-    def __init__(self, runinfo: RunInfo | None = None):
+    def __init__(self, logger_config: LoggerConfig | None = None):
+        self.config = logger_config
+        self.parent = None
+        self.runinfo = None
 
+
+    def update_config(self, logger_config: LoggerConfig):
+        self.config = logger_config
+
+    def update_runinfo(self, runinfo : RunInfo):
         self.runinfo = runinfo
 
     def log_epoch(self, metrics: EpochMetrics, epoch: int):
@@ -41,6 +55,8 @@ class Logger:
     def log_interruption(self, context: str):
         # If the model training is interrupted, what do we do?
         pass
+    def log_message(self, message : str, verobosity = 1):
+        pass
 
 
 class PipelineLogger(Logger):
@@ -49,15 +65,27 @@ class PipelineLogger(Logger):
 
     """
 
-    def __init__(self, loggers: dict[str, Logger] = {}):
+    def __init__(self,logger_config: LoggerConfig, loggers: dict[str, Logger] = {}):
 
+        self.config = logger_config
         self.loggers = loggers
+        if self.config is not None:
+            for key in self.loggers.keys():
+                self.loggers[key].parent = self
+                self.loggers[key].update_config(logger_config)
 
     def set_logger(self, key: str, logger: Logger):
         self.loggers[key] = logger
 
     def reset_logger(self):
         self.loggers = {}
+
+
+    def update_runinfo(self, runinfo : RunInfo):
+        self.runinfo = RunInfo
+        for key in self.loggers.keys():
+
+            self.loggers[key].update_runinfo(runinfo)
 
     def log_epoch(self, metrics: EpochMetrics, epoch: int):
         for key in self.loggers.keys():
@@ -96,14 +124,22 @@ class PipelineLogger(Logger):
         for exception in exceptions:
             raise exception
 
+    def log_message(self, message : str, verobosity = 1):
+        if verobosity >= self.config.verbosity:
+            for key in self.loggers.keys():
+
+                self.loggers[key].log_message(message, verobosity)
+
 
 class LocalLogger(Logger):
     """
     The default logger.
-    Prints epoch loss, test results and prints a figure if allowed (toggle off for batch runs).
+    Prints epoch loss, test results..
     """
 
-    def __init__(self, show_figure: bool = True):
+    def __init__(self, logger_config: LoggerConfig | None = None,show_figure: bool = True):
+        self.parent = None
+        self.config = logger_config
         self.show_figure = show_figure
 
     def log_epoch(self, metrics: EpochMetrics, epoch: int):
@@ -119,7 +155,10 @@ class LocalLogger(Logger):
     def log_figure(self, fig):
         if self.show_figure:
             plt.show()
-
+        
+    def log_message(self, message : str, verobosity = 1):
+        if verobosity >= self.config.verbosity:
+            print(message)
 
 class OptunaLogger(Logger):
     """
@@ -131,9 +170,11 @@ class OptunaLogger(Logger):
         # It should then allow the other loggers to exit gracefully before reraising the interruption with the optuna specific error.
 
         trial = self.runinfo.trial
+
         if trial:
             # Report the loss to let the pruner decide if it is time to prune.
             trial.report(metrics.epoch_loss, epoch)
+            
 
             # Should be prune?
             if trial.should_prune():
@@ -150,12 +191,13 @@ class OptunaLogger(Logger):
         # Set the trial user attribute "mlflow_run_id" to trial, and add the model config to "config"
         runinfo = self.runinfo
         trial = runinfo.trial
-        if runinfo:
+        if trial:
             trial.set_user_attr("mlflow_run_id", runinfo.run_id)
             trial.set_user_attr("config", model.config.dict())
 
 
 class MLFlowLogger(Logger):
+
 
     def log_epoch(self, metrics: EpochMetrics, epoch: int):
         # convert the metrics into a dictionary using asdict() and log at step = epoch:
@@ -184,34 +226,31 @@ class MLFlowLogger(Logger):
 
 
 class FinalLogger(MLFlowLogger):
-    """
-    This logger only needs a different log_model method to its parent class,
-    turning the model into a scripted model with less source code and dependencies to handle.
 
-    It then registers a tag in mlflow that identifies that this is the optimal
-
-    This way we avoid bloating the registry, and we can register our first model.
-    In this example we will promote it to the registry directly.
-    """
 
     def log_model(self, model: Module):
-
+        model_name = self.config.model_name_uc
         # Log the parameters as usual
         mlflow.log_params(model.config.dict())
-        model_string = yaml.dump(model.config.model_dump())
+
+        #Include a yaml copy of the pipeline config
+        model_string = yaml.dump(self.config.model_dump())
         mlflow.log_text(model_string, artifact_file="configs/ModelConfig.yaml")
 
-        # Set a the "status" tag to "optimal", identifying this as the optimization winner
-        mlflow.set_tag("status", "optimal")
+        
 
-        # export to a scripted model with torch.jit.script(model)
-        script_model = torch.jit.script(model)
 
         # provide an input example to infer signature.
-        data_example = construct_data(model.config).test_loader.dataset[0:10][0].numpy()
-        # Register our model:
-        mlflow.pytorch.log_model(
-            pytorch_model=script_model,
-            registered_model_name=REGISTERED_MODEL_NAME,
-            input_example=data_example,
-        )
+        dataconfig = load_pipeline_config().data
+        input_example = get_data_db(dataconfig).test_loader.dataset[0:10][0]
+        with torch.no_grad():
+            output_example = model(input_example)
+        signature = infer_signature(input_example.numpy(), output_example.numpy())
+
+
+
+        info = mlflow.pytorch.log_model(model, registered_model_name=model_name,input_example=input_example.numpy())
+        #Set a the "status" tag to "optimal", identifying this as the optimization winner
+        client = MlflowClient()
+        client.set_registered_model_alias(name=model_name, alias="contender", version=int(info.registered_model_version))
+        

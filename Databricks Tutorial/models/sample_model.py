@@ -1,16 +1,17 @@
 import torch
 
-from configs.model_config import RunInfo, ModelConfig
+from configs.pipeline_config import RunInfo, ModelConfig
 from torch import nn
 import yaml
-from demo.constants import CONFIG_DIR
+
 
 
 class MlpModel(nn.Module):
     # Just a MLP that can be generalized down to a linear regression if depth=0.
-    def __init__(self, config: ModelConfig, runinfo: RunInfo | None = None):
+    def __init__(self, config: ModelConfig):
         super(MlpModel, self).__init__()
         if config.n_depth > 0:
+
             inp_layer = nn.Sequential(
                 nn.Linear(in_features=2, out_features=config.n_width), nn.ReLU()
             )
@@ -33,7 +34,7 @@ class MlpModel(nn.Module):
             )
 
         self.config = config
-        self.runinfo = runinfo
+
 
     def forward(self, in_tensor: torch.Tensor):
 

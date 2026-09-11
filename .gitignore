@@ -1,5 +1,5 @@
 mlruns/
-configs/__pycache__/
-demo/__pycache__/__init__.cpython-312.pyc
-demo/__pycache__/
 .idea/
+__pycache__
+Optuna Tutorial/optuna.db
+MLflow Tutorial/mlflow.db

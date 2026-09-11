@@ -1,0 +1,14 @@
+n_trials: 30
+n_jobs: 1
+timeout: 300
+n_startup_trials: 5
+n_warmup_steps: 1
+
+storage:
+  dir_path: optuna_studies
+  db_name: "optuna.db"
+
+study:
+  study: "optuna_dev"
+  load_if_exists: true
+  seed: 42

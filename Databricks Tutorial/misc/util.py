@@ -1,7 +1,7 @@
 import yaml
 from pathlib import Path
-from demo.constants import CONFIG_DIR
-from configs.model_config import ModelConfig
+from constants import CONFIG_DIR
+from configs.pipeline_config import PipelineConfig
 from configs.mlflow_config import MlflowServiceConfig
 from configs.optuna_config import OptunaRunnerConfig
 
@@ -11,11 +11,12 @@ def read_config(path: Path):
         return yaml.safe_load(f)
 
 
-def load_model_config(path=CONFIG_DIR.MODEL.value) -> ModelConfig:
 
-    config = ModelConfig.model_validate(read_config(path))
+
+def load_pipeline_config(path=CONFIG_DIR.PIPELINE.value) -> PipelineConfig:
+
+    config = PipelineConfig.model_validate(read_config(path))
     return config
-
 
 def load_mlflow_config(path=CONFIG_DIR.MLFLOW.value) -> MlflowServiceConfig:
 

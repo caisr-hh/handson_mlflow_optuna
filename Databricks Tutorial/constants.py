@@ -10,6 +10,7 @@ class LOGGERS(Enum):
 
 class CONFIG_DIR(Enum):
     MODEL = "configs/model_config.yaml"
+    PIPELINE = "configs/pipeline_config.yaml"
     OPTUNA = "configs/optuna.yaml"
     MLFLOW = "configs/mlflow.yaml"
 
