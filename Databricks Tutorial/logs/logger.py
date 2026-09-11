@@ -233,8 +233,8 @@ class FinalLogger(MLFlowLogger):
         # Log the parameters as usual
         mlflow.log_params(model.config.dict())
 
-        #Include a yaml copy of the model config
-        model_string = yaml.dump(model.config.model_dump())
+        #Include a yaml copy of the pipeline config
+        model_string = yaml.dump(self.config.model_dump())
         mlflow.log_text(model_string, artifact_file="configs/ModelConfig.yaml")
 
         
