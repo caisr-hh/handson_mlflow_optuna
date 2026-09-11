@@ -364,7 +364,7 @@ class Pipeline_Evaluator(Pipeline):
 
 
 
-class Pipeline_Deploy(Pipeline_Evaluator):
+class _Pipeline_Deploy(Pipeline_Evaluator):
     def run(self):
         #Evaluates the current champion and determines if it needs to be retrained.
         update = self.compete()
@@ -439,7 +439,6 @@ class Pipeline_Promote(Pipeline_Evaluator):
         update = self.compete()
         if update:
             self.promote()
-            self.deploy()
         
         return update
 
@@ -470,6 +469,17 @@ class Pipeline_Promote(Pipeline_Evaluator):
         client.set_registered_model_alias(name=info.name, alias="champion", version=info.version)
         client.delete_registered_model_alias(name=info.name, alias="contender")
         self.logger.log_message(f"Promoted model {info.name} version {info.version} to champion.")
+
+class Pipeline_Deploy(Pipeline_Evaluator):
+    def run(self):
+        #Evaluates the current champion and determines if it needs to be retrained.
+ 
+        self.deploy()
+        
+        return
+
+
+
     def deploy(self):
         #Deploy the model to a serving endpoint
         deploy_client = mlflow.deployments.get_deploy_client("databricks")
@@ -499,7 +509,6 @@ class Pipeline_Promote(Pipeline_Evaluator):
             self.logger.log_message("Updating existing endpoint")
             deploy_client.update_endpoint(self.config.logger.endpoint_name, config)
         self.logger.log_message(f"Deployed model {info.name} version {info.version} to endpoint {self.config.logger.endpoint_name}.")
-
 
 
 

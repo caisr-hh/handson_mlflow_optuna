@@ -20,6 +20,4 @@ from misc.util import load_pipeline_config
 from pipelines import Pipeline_Deploy
 config = load_pipeline_config()
 pipeline = Pipeline_Deploy(config)
-result = pipeline.run()
-
-dbutils.jobs.taskValues.set("result", result)
+pipeline.run()
