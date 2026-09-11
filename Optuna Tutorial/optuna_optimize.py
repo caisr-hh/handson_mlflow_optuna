@@ -38,9 +38,9 @@ study=optuna.create_study(study_name="test study",direction="minimize", storage=
 
 study.optimize(func = objective,n_trials = n_trials)
 
-
-plt.scatter(x[labels], y[labels], marker = 'o', alpha=0.5)
-plt.scatter(x[~labels], y[~labels], marker = 'v', alpha = 0.5)
+fig, ax = plt.subplots()
+ax.scatter(x[labels], y[labels], marker = 'o', alpha=0.5)
+ax.scatter(x[~labels], y[~labels], marker = 'v', alpha = 0.5)
 
 for trial in study.trials:
     _k = trial.params["k"]
@@ -48,10 +48,12 @@ for trial in study.trials:
     _x = np.array([0, 1])
     _y = np.array([_m, _k + _m])
 
-    plt.plot(_x, _y, color = cmap(trial.number/n_trials), alpha = 0.5)
+    ax.plot(_x, _y, color = cmap(trial.number/n_trials), alpha = 0.5)
 
 norm = mpl.colors.Normalize(vmin=0, vmax=n_trials)
 sm = mpl.cm.ScalarMappable(cmap=cmap, norm=norm)
+sm.set_array([])
+fig.colorbar(sm, ax=ax, label="Trial number")
 
 _x = np.array([0, 1])
 _y = np.array([m, k + m])
