@@ -2,15 +2,14 @@ from torch.utils.data import TensorDataset, DataLoader
 from sklearn.datasets import make_circles
 from sklearn.model_selection import train_test_split
 from pydantic import BaseModel
-from configs.model_config import ModelConfig
+from configs.pipeline_config import PipelineConfig, DataConfig
 from dataclasses import dataclass
 from typing import Any
 import torch
-import yaml
 
 
 class ModelData(BaseModel):
-    config: ModelConfig
+    config: DataConfig
     training_loader: Any
     test_loader: Any
 
@@ -26,14 +25,17 @@ class TestMetrics:
     test_loss: float
     test_accuracy: float
 
-
+"""
 def load_data_config(path="config/DefaultDataConfig.yaml"):
     with open(path, "r") as f:
         config = ModelConfig.model_validate(yaml.safe_load(f))
         return config
 
+"""
 
-def construct_data(config: ModelConfig) -> ModelData:
+
+
+def construct_data(config: DataConfig) -> ModelData:
     input, labels = make_circles(
         n_samples=config.n_samples,
         noise=config.noise,
@@ -60,3 +62,5 @@ def construct_data(config: ModelConfig) -> ModelData:
         config=config, training_loader=training_loader, test_loader=test_loader
     )
     return data
+
+

@@ -1,0 +1,11 @@
+n_width: 26
+n_depth: 1
+learning_rate: 0.001
+epoch_max: 10
+seed: 42
+n_samples: 3000
+noise: 0.03
+factor: 0.8
+train_split: 0.7
+random_state: 42
+batch_size: 32
