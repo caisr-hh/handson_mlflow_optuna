@@ -252,5 +252,5 @@ class FinalLogger(MLFlowLogger):
         info = mlflow.pytorch.log_model(model, registered_model_name=model_name,input_example=input_example.numpy())
         #Set a the "status" tag to "optimal", identifying this as the optimization winner
         client = MlflowClient()
-        client.set_registered_model_alias(name=model_name, alias="contender", version=int(info.registered_model_version))
+        client.set_registered_model_alias(name=model_name, alias="contender", version=int(info.registered_model_version),code_paths=["models"])
         

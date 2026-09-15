@@ -282,8 +282,6 @@ class Pipeline_Retrain(Pipeline):
             self.logger.update_runinfo(runinfo)
             self.run_instance()
 
-        #self.compare()
-        #self.deploy()
     
 
     def save(self, model):
@@ -364,74 +362,6 @@ class Pipeline_Evaluator(Pipeline):
 
 
 
-class _Pipeline_Deploy(Pipeline_Evaluator):
-    def run(self):
-        #Evaluates the current champion and determines if it needs to be retrained.
-        update = self.compete()
-        if update:
-            self.promote()
-            self.deploy()
-        
-        return update
-
-    def compete(self) -> bool:
-        #Compares the current champion and the condender, returning True if the contender should be promoted and deployed.
-        self.model = self.get_alias_model("champion")
-        if self.model != None:
-            #Get and evaluate model on new data
-
-            metrics_old = self.evaluate()
-            self.model = self.get_alias_model("contender")
-            assert self.model is not None, "Contender not found, nothing to promote!"
-            metrics_new = self.evaluate()
-            if metrics_new.test_loss < metrics_old.test_loss:
-                return(True)
-            else:
-                self.logger.log_message("Contender did not beat the champion, keeping champion.")
-                return(False)
-        else:
-
-            self.model = self.get_alias_model("contender")
-            assert self.model is not None, "Contender not found, nothing to promote."
-            return(True) #No existing champion, victory by default.
-    def promote(self):
-        #Promote the contender to champion
-        client = MlflowClient()
-        info = self.get_alias_version("contender")
-        client.set_registered_model_alias(name=info.name, alias="champion", version=info.version)
-        client.delete_registered_model_alias(name=info.name, alias="contender")
-        self.logger.log_message(f"Promoted model {info.name} version {info.version} to champion.")
-    def deploy(self):
-        #Deploy the model to a serving endpoint
-        deploy_client = mlflow.deployments.get_deploy_client("databricks")
-        endpoint = None
-        info = self.get_alias_version("champion")
-        config = {
-            "served_entities":[
-                {
-                    "entity_name": self.config.logger.model_name_uc,
-                    "entity_version": info.version,
-                    "scale_to_zero_enabled":True,
-                    "workload_size": "Small"
-
-                }
-            ]
-        }
-        try:
-            endpoint = deploy_client.get_endpoint(self.config.logger.endpoint_name)
-
-        except:
-            self.logger.log_message("Unable to find existing endpoint, creating new...")
-
-        if endpoint is None:
-            self.logger.log_message("Creating new endpoint...")
-            deploy_client.create_endpoint(self.config.logger.endpoint_name, config)
-        else:
-            self.logger.log_message("Updating existing endpoint")
-            deploy_client.update_endpoint(self.config.logger.endpoint_name, config)
-        self.logger.log_message(f"Deployed model {info.name} version {info.version} to endpoint {self.config.logger.endpoint_name}.")
-
-        
 
 class Pipeline_Promote(Pipeline_Evaluator):
     def run(self):
