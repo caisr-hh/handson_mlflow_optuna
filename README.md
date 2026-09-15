@@ -4,9 +4,9 @@ Here you can find the scripts used during the session to follow allong or tinker
 
 For the optuna and mlflow tutorials, please run: 
 
-conda env create -f conda.yaml 
+`conda env create -f conda.yaml `
 
-conda activate ecml_tutorial (or add it directly into your choice of IDE)
+`conda activate ecml_tutorial` (or add it directly into your choice of IDE).
 
 The databricks tutorial is designed around the base ML (v5) environment so simply select that preset, no need for additional requirment files.
 
