@@ -3,3 +3,4 @@ mlruns/
 __pycache__
 Optuna Tutorial/optuna.db
 MLflow Tutorial/mlflow.db
+/MLflow Tutorial/mlartifacts

@@ -16,8 +16,8 @@ class Pipeline():
         dataconfig = DataConfig()
         self.study = None
         self.data = construct_data(dataconfig)
-        self.n_width = 32
-        self.n_depth = 3
+        self.n_width = 16
+        self.n_depth = 2
 
     def run(self):
 
